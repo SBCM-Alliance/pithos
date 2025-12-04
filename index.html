@@ -13,7 +13,6 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* --- MONOCHROME THEME --- */
         :root {
             --bg: #000000;
             --fg: #ffffff;
@@ -37,6 +36,7 @@
         #screen-loader {
             display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
             z-index: 100; position: absolute; top: 0; left: 0; width: 100%; background: #000;
+            cursor: pointer;
         }
         .loading-bar { width: 200px; height: 2px; background: #333; margin-top: 10px; position: relative; overflow: hidden; }
         .loading-bar::after {
@@ -47,15 +47,15 @@
 
         /* --- SCREEN 1: VOID --- */
         #screen-void {
-            display: flex; align-items: center; justify-content: center; height: 100%;
+            display: none; align-items: center; justify-content: center; height: 100%;
             font-size: 1.2rem; cursor: pointer; width: 100%;
         }
         .blink { animation: blink 1.5s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        /* --- SCREEN 2: AUTH (Ritual) --- */
+        /* --- SCREEN 2: AUTH --- */
         #screen-auth {
-            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
+            display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%;
         }
         .auth-input {
             background: transparent; border: none; border-bottom: 1px solid var(--dim);
@@ -65,12 +65,11 @@
         .auth-input:focus { border-bottom: 1px solid var(--fg); }
         #pattern-container { position: relative; width: 300px; height: 300px; touch-action: none; margin-top: 20px;}
 
-        /* --- SCREEN 3: DASHBOARD (Main) --- */
+        /* --- SCREEN 3: DASHBOARD --- */
         #screen-main {
-            height: 100%; display: flex; width: 100%;
+            display: none; height: 100%; width: 100%;
         }
 
-        /* Sidebar */
         .sidebar {
             width: 60px; border-right: var(--border);
             display: flex; flex-direction: column; align-items: center; padding-top: 30px;
@@ -84,7 +83,6 @@
         .nav-btn:hover { color: var(--fg); }
         .nav-btn.active { color: var(--fg); border: var(--active-border); }
 
-        /* Content Area */
         .content { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
         
         .header {
@@ -93,11 +91,9 @@
         }
         .user-id { font-size: 0.8rem; color: var(--dim); }
 
-        /* Modules */
         .module { display: none; animation: fadeIn 0.3s; }
         .module.active { display: block; }
 
-        /* Cards & Forms */
         .card { border: var(--border); padding: 15px; margin-bottom: 15px; }
         .card-title {
             font-size: 0.8rem; color: var(--dim); margin-bottom: 10px; text-transform: uppercase;
@@ -120,7 +116,6 @@
         }
         .btn-action:hover { background: #fff; color: #000; }
 
-        /* Console Log */
         .console {
             margin-top: 20px;
             border-top: var(--border); background: #000;
@@ -131,108 +126,106 @@
         .log-time { color: #444; margin-right: 5px; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .hidden { display: none !important; }
     </style>
 
     <script>
-        // --- NOSTR BRIDGE ---
+        // Nostr Bridge
         let sk=null; let pk=null; const relays=['wss://relay.damus.io','wss://nos.lol'];
         function js_set_key(hex){ try{sk=hex; pk=window.NostrTools.getPublicKey(sk); return pk;}catch(e){return null;} }
         async function js_pub(k,c,t){ if(!sk)return "NO_KEY"; const e={kind:k,pubkey:pk,created_at:Math.floor(Date.now()/1000),tags:t,content:c}; e.id=window.NostrTools.getEventHash(e); e.sig=window.NostrTools.signEvent(e,sk); const p=new window.NostrTools.SimplePool(); p.publish(relays,e); return e.id; }
         
-        // --- UI SWITCHER ---
+        // UI Switcher
         function switchMod(id){ 
             document.querySelectorAll('.module').forEach(e=>e.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active'));
             document.getElementById('m-'+id).classList.add('active');
             document.getElementById('btn-'+id).classList.add('active');
         }
+
+        // Force Start (Rescue)
+        function forceStart(){
+            document.getElementById('screen-loader').style.display = 'none';
+            document.getElementById('screen-void').style.display = 'flex';
+        }
     </script>
 </head>
 <body>
 
-    <!-- 0. LOADER -->
-    <div id="screen-loader">
+    <!-- 0. LOADER (Tap to force start if stuck) -->
+    <div id="screen-loader" onclick="forceStart()">
         <div style="font-size: 0.8rem; letter-spacing: 2px;">INITIALIZING PITHOS...</div>
         <div class="loading-bar"></div>
+        <div style="margin-top:20px; font-size:0.6rem; color:#444;">(Tap if stuck)</div>
     </div>
 
-    <!-- 1. VOID (Initially hidden by style) -->
-    <div id="screen-void" style="display: none;" onclick="toAuth()">
+    <!-- 1. VOID -->
+    <div id="screen-void" onclick="toAuth()">
         <span class="blink">&gt; login: TAP TO START</span>
     </div>
 
-    <!-- 2. AUTH (Initially hidden) -->
-    <div id="screen-auth" style="display: none;">
+    <!-- 2. AUTH -->
+    <div id="screen-auth">
         <input type="text" id="in-name" class="auth-input" placeholder="NAME (名前)" autocomplete="off">
         <input type="text" id="in-word" class="auth-input" placeholder="WORD (信念)" autocomplete="off">
-        
         <div style="font-size:0.7rem; color:#666;">DRAW SIGIL (印)</div>
         <div id="pattern-container">
             <canvas id="lock-canvas" width="300" height="300"></canvas>
         </div>
     </div>
 
-    <!-- 3. MAIN OS (Initially hidden) -->
-    <div id="screen-main" style="display: none;">
-        <!-- Sidebar -->
+    <!-- 3. MAIN -->
+    <div id="screen-main">
         <div class="sidebar">
-            <div id="btn-audit" class="nav-btn active" onclick="switchMod('audit')" title="Auditor"><i class="fas fa-eye"></i></div>
-            <div id="btn-yorbee" class="nav-btn" onclick="switchMod('yorbee')" title="Yorbee"><i class="fas fa-users"></i></div>
-            <div id="btn-gcart" class="nav-btn" onclick="switchMod('gcart')" title="G-Cart"><i class="fas fa-building"></i></div>
+            <div id="btn-audit" class="nav-btn active" onclick="switchMod('audit')"><i class="fas fa-eye"></i></div>
+            <div id="btn-yorbee" class="nav-btn" onclick="switchMod('yorbee')"><i class="fas fa-users"></i></div>
+            <div id="btn-gcart" class="nav-btn" onclick="switchMod('gcart')"><i class="fas fa-building"></i></div>
         </div>
 
-        <!-- Content -->
         <div class="content">
             <div class="header">
                 <div>PITHOS OS <span style="font-size:0.7rem; border:1px solid #fff; padding:1px 4px; margin-left:5px;">v2.0</span></div>
                 <div class="user-id" id="disp-uid">OFFLINE</div>
             </div>
 
-            <!-- MODULE: AUDITOR -->
+            <!-- MODULES -->
             <div id="m-audit" class="module active">
                 <div class="card">
                     <div class="card-title">SBCM SCANNER</div>
-                    <label>TARGET NAME</label>
-                    <input type="text" id="a-target" placeholder="例: 駅前モニュメント">
-                    <label>BUDGET (JPY)</label>
-                    <input type="number" id="a-budget" placeholder="30000000">
-                    <label>USERS (DAILY)</label>
-                    <input type="number" id="a-users" placeholder="5">
-                    
+                    <label>TARGET NAME</label><input type="text" id="a-target" placeholder="例: 駅前モニュメント">
+                    <label>BUDGET (JPY)</label><input type="number" id="a-budget" placeholder="30000000">
+                    <label>USERS (DAILY)</label><input type="number" id="a-users" placeholder="5">
                     <button class="btn-action" py-click="audit">CALCULATE & COMMIT</button>
                 </div>
                 <div class="card">
-                    <div class="card-title">LATEST RESULT</div>
+                    <div class="card-title">RESULT</div>
                     <div id="a-res" style="font-size:1.5rem;">READY</div>
                 </div>
             </div>
 
-            <!-- MODULE: YORBEE -->
             <div id="m-yorbee" class="module">
                 <div class="card">
-                    <div class="card-title">ACTIVE QUESTS (Global)</div>
+                    <div class="card-title">ACTIVE QUESTS</div>
                     <ul style="padding-left:20px; font-size:0.9rem; color:#ccc;">
-                        <li style="margin-bottom:5px;">ROAD REPAIR [KASHIWA] - ¥50,000</li>
-                        <li style="margin-bottom:5px;">DATA CLEANING [TOKYO] - ¥30,000</li>
+                        <li>ROAD REPAIR [KASHIWA] - ¥50,000</li>
+                        <li>DATA CLEANING [TOKYO] - ¥30,000</li>
                     </ul>
                 </div>
                 <div class="card">
                     <div class="card-title">CREATE QUEST</div>
-                    <label>QUEST TITLE</label>
-                    <input type="text" id="y-title" placeholder="JOB TITLE">
-                    <button class="btn-action" py-click="post_job">POST TO NETWORK</button>
+                    <label>TITLE</label><input type="text" id="y-title" placeholder="JOB TITLE">
+                    <button class="btn-action" py-click="post_job">POST</button>
                 </div>
             </div>
 
-            <!-- MODULE: G-CART -->
             <div id="m-gcart" class="module">
                 <div class="card">
-                    <div class="card-title">COMPANY STATUS</div>
+                    <div class="card-title">STATUS</div>
                     <div>CAPACITY: ¥30,000,000</div>
                 </div>
                 <div class="card">
-                    <div class="card-title">AUTO BID (JV)</div>
-                    <label>SELECT TENDER</label>
+                    <div class="card-title">AUTO BID</div>
+                    <label>TENDER</label>
                     <select id="g-sel">
                         <option>SCHOOL RENOVATION (¥50M)</option>
                         <option>PIPE MAINTENANCE (¥12M)</option>
@@ -241,10 +234,7 @@
                 </div>
             </div>
 
-            <!-- System Log -->
-            <div class="console" id="sys-log">
-                <div class="log-entry">SYSTEM BOOTING...</div>
-            </div>
+            <div class="console" id="sys-log"><div class="log-entry">SYSTEM LOADING...</div></div>
         </div>
     </div>
 
@@ -274,7 +264,6 @@
             const d=dots.find(dt=>Math.hypot(dt.x-x,dt.y-y)<30);
             if(d && !pPath.includes(d.id)){ pPath.push(d.id); dr(); }
         }
-        // Mouse & Touch Events
         const start = e => { isD=true; pPath=[]; proc(e); };
         const move = e => { if(isD){ e.preventDefault(); proc(e); } };
         const end = e => {
@@ -282,32 +271,82 @@
             if(pPath.length>=4) window.onSigil(document.getElementById('in-name').value, document.getElementById('in-word').value, pPath.join("-"));
             else { pPath=[]; dr(); }
         };
-
         cvs.addEventListener('mousedown', start); cvs.addEventListener('touchstart', start);
         cvs.addEventListener('mousemove', move); cvs.addEventListener('touchmove', move);
         cvs.addEventListener('mouseup', end); cvs.addEventListener('touchend', end);
-        
         dr();
-        
         function toAuth(){ 
             document.getElementById('screen-void').style.display='none'; 
             document.getElementById('screen-auth').style.display='flex'; 
         }
     </script>
 
-    <!-- PYTHON LOGIC -->
-    <script type="py">
-        from pyscript import document
-        from pyodide.ffi import create_proxy
-        import js, hashlib
-        from datetime import datetime
+<!-- PYTHON LOGIC (Indentation fixed) -->
+<script type="py">
+from pyscript import document
+from pyodide.ffi import create_proxy
+import js, hashlib
+from datetime import datetime
 
-        # BOOT COMPLETE HANDLER
-        def boot():
-            # Python is ready: Switch from Loader to Void
-            document.getElementById('screen-loader').style.display = 'none'
-            document.getElementById('screen-void').style.display = 'flex'
-            log("SYSTEM READY. WAITING FOR INPUT.")
+# Boot Handler
+def boot():
+    # Hide loader, show void
+    document.getElementById('screen-loader').style.display = 'none'
+    document.getElementById('screen-void').style.display = 'flex'
+    log("SYSTEM READY.")
 
-        def log(m):
-            t = datetime.now().strftime('%H:%M:%
+def log(m):
+    t = datetime.now().strftime('%H:%M:%S')
+    c = document.getElementById("sys-log")
+    if c:
+        c.innerHTML = f"<div class='log-entry'><span class='log-time'>[{t}]</span>{m}</div>" + c.innerHTML
+
+def on_sigil_py(name, word, pattern):
+    if not name or not word:
+        log("AUTH ERROR: INPUT MISSING")
+        return
+    
+    seed = f"SBCM_V2_{name}_{word}_{pattern}"
+    pk_hex = hashlib.sha256(seed.encode('utf-8')).hexdigest()
+    pub = js.js_set_key(pk_hex)
+    
+    if pub:
+        document.getElementById('screen-auth').style.display = 'none'
+        document.getElementById('screen-main').style.display = 'flex'
+        
+        short = f"{pub[:4]}...{pub[-4:]}"
+        document.getElementById('disp-uid').innerText = f"{name.upper()} :: {short}"
+        log(f"IDENTITY CONFIRMED: {name}")
+        log("CONNECTED TO RELAYS.")
+
+js.window.onSigil = create_proxy(on_sigil_py)
+
+async def audit(e):
+    try:
+        b = float(document.getElementById("a-budget").value)
+        u = float(document.getElementById("a-users").value)
+        t = document.getElementById("a-target").value
+        if u==0: u=1
+        d = b/30000000/(u/72000)
+        v = "SAFE" if d<10 else "SCAM"
+        
+        document.getElementById("a-res").innerText = f"D: {d:.2f} [{v}]"
+        eid = await js.js_pub(1, f"AUDIT: {t}\nD:{d:.2f}\n#{v}", [["t","SBCM_AUDIT"]])
+        log(f"AUDIT COMMITTED: {eid[:8]}")
+    except: log("INPUT ERROR")
+
+async def post_job(e):
+    t = document.getElementById("y-title").value
+    eid = await js.js_pub(1, f"JOB: {t}\n#SBCM_JOB", [["t","SBCM_JOB"]])
+    log(f"JOB POSTED: {eid[:8]}")
+
+async def bid(e):
+    t = document.getElementById("g-sel").value
+    eid = await js.js_pub(1, f"BID: {t}\n#SBCM_BID", [["t","SBCM_BID"]])
+    log(f"BID SUBMITTED: {eid[:8]}")
+
+# Run Boot
+boot()
+</script>
+</body>
+</html>
