@@ -3,302 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pithos | Sigil Access</title>
+    <title>Pithos | Logic OS</title>
     
     <!-- Libraries -->
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        :root { --bg: #000; --fg: #fff; --dim: #444; }
-        body { background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; margin: 0; padding: 0; height: 100vh; overflow: hidden; user-select: none; }
+        /* --- MONOCHROME THEME --- */
+        :root {
+            --bg: #000000;
+            --fg: #ffffff;
+            --dim: #666666;
+            --border: 1px solid #333333;
+            --active-border: 1px solid #ffffff;
+        }
 
-        /* --- SCREEN 1: THE VOID --- */
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: 'JetBrains Mono', monospace;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- UTILS --- */
+        .hidden { display: none !important; }
+        .blink { animation: blink 2s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* --- SCREEN 1: VOID --- */
         #screen-void {
             display: flex; align-items: center; justify-content: center; height: 100%;
-            font-size: 1.5rem; cursor: pointer; animation: blink 2s infinite;
+            font-size: 1.2rem; cursor: pointer;
         }
 
-        /* --- SCREEN 2: AUTH --- */
+        /* --- SCREEN 2: AUTH (Ritual) --- */
         #screen-auth {
             display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%;
-            padding: 20px; box-sizing: border-box;
         }
+        .auth-input {
+            background: transparent; border: none; border-bottom: 1px solid var(--dim);
+            color: var(--fg); font-family: inherit; font-size: 1.2rem; padding: 10px;
+            width: 280px; margin-bottom: 30px; outline: none; text-align: center;
+        }
+        .auth-input:focus { border-bottom: 1px solid var(--fg); }
+        #pattern-container { position: relative; width: 300px; height: 300px; touch-action: none; margin-top: 20px;}
+
+        /* --- SCREEN 3: DASHBOARD (Main) --- */
+        #screen-main {
+            display: none; height: 100%; display: flex; /* Flex is set by JS later */
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 70px; border-right: var(--border);
+            display: flex; flex-direction: column; align-items: center; padding-top: 30px;
+        }
+        .nav-btn {
+            width: 40px; height: 40px; margin-bottom: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; color: var(--dim); cursor: pointer; transition: 0.2s;
+            border: 1px solid transparent;
+        }
+        .nav-btn:hover { color: var(--fg); }
+        .nav-btn.active { color: var(--fg); border: var(--active-border); }
+
+        /* Content Area */
+        .content { flex: 1; padding: 30px; overflow-y: auto; position: relative; }
         
-        .input-group { width: 100%; max-width: 300px; margin-bottom: 30px; }
-        label { display: block; font-size: 0.8rem; color: var(--dim); margin-bottom: 5px; }
-        input {
-            width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--fg);
-            color: var(--fg); font-family: inherit; font-size: 1.2rem; padding: 5px; outline: none; border-radius: 0;
+        .header {
+            display: flex; justify-content: space-between; border-bottom: var(--border);
+            padding-bottom: 15px; margin-bottom: 30px;
         }
-        input::placeholder { color: #333; }
+        .user-id { font-size: 0.8rem; color: var(--dim); }
 
-        /* PATTERN LOCK (SIGIL) */
-        #pattern-container { position: relative; width: 300px; height: 300px; touch-action: none; }
-        canvas { position: absolute; top: 0; left: 0; }
+        /* Modules */
+        .module { display: none; animation: fadeIn 0.3s; }
+        .module.active { display: block; }
 
-        /* --- SCREEN 3: TERMINAL --- */
-        #screen-term {
-            display: none; padding: 20px; height: 100%; overflow-y: auto; font-size: 14px;
+        /* Cards & Forms */
+        .card {
+            border: var(--border); padding: 20px; margin-bottom: 20px;
         }
-        .line { margin-bottom: 5px; white-space: pre-wrap; word-break: break-all; }
-        .prompt { color: var(--fg); font-weight: bold; margin-right: 10px; }
-        #cmd { background: transparent; border: none; color: var(--fg); font-family: inherit; font-size: inherit; flex: 1; outline: none; width: 80%; }
+        .card-title {
+            font-size: 0.9rem; color: var(--dim); margin-bottom: 15px; text-transform: uppercase;
+            border-bottom: 1px dashed #333; padding-bottom: 5px;
+        }
 
-        /* Utils */
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        .hidden { display: none !important; }
+        input, select {
+            width: 100%; background: #000; color: #fff; border: var(--border);
+            padding: 12px; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;
+            outline: none;
+        }
+        input:focus, select:focus { border: var(--active-border); }
+
+        label { display: block; font-size: 0.7rem; color: var(--dim); margin-bottom: 5px; }
+
+        .btn-action {
+            width: 100%; padding: 15px; background: #000; color: #fff;
+            border: var(--active-border); font-weight: bold; cursor: pointer;
+            text-transform: uppercase; transition: 0.2s;
+        }
+        .btn-action:hover { background: #fff; color: #000; }
+
+        /* Console Log */
+        .console {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            height: 120px; border-top: var(--border); background: #000;
+            padding: 10px; box-sizing: border-box; overflow-y: auto;
+            font-size: 0.75rem; color: var(--dim);
+        }
+        .log-entry { margin-bottom: 2px; }
+        .log-time { color: #444; margin-right: 5px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 
     <script>
-        // Nostr Bridge
+        // --- NOSTR BRIDGE ---
         let sk=null; let pk=null; const relays=['wss://relay.damus.io','wss://nos.lol'];
         function js_set_key(hex){ try{sk=hex; pk=window.NostrTools.getPublicKey(sk); return pk;}catch(e){return null;} }
-        async function js_pub(k,c,t){ if(!sk)return "NO_AUTH"; const e={kind:k,pubkey:pk,created_at:Math.floor(Date.now()/1000),tags:t,content:c}; e.id=window.NostrTools.getEventHash(e); e.sig=window.NostrTools.signEvent(e,sk); const p=new window.NostrTools.SimplePool(); p.publish(relays,e); return e.id; }
+        async function js_pub(k,c,t){ if(!sk)return "NO_KEY"; const e={kind:k,pubkey:pk,created_at:Math.floor(Date.now()/1000),tags:t,content:c}; e.id=window.NostrTools.getEventHash(e); e.sig=window.NostrTools.signEvent(e,sk); const p=new window.NostrTools.SimplePool(); p.publish(relays,e); return e.id; }
+        
+        // --- UI SWITCHER ---
+        function switchMod(id){ 
+            document.querySelectorAll('.module').forEach(e=>e.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active'));
+            document.getElementById('m-'+id).classList.add('active');
+            document.getElementById('btn-'+id).classList.add('active');
+        }
     </script>
 </head>
 <body>
 
     <!-- 1. VOID -->
     <div id="screen-void" onclick="toAuth()">
-        &gt; login:<span style="width:10px; background:white; display:inline-block; margin-left:5px;">&nbsp;</span>
+        <span class="blink">&gt; login:</span>
     </div>
 
-    <!-- 2. AUTH (Name + Word + Sigil) -->
+    <!-- 2. AUTH (Ritual) -->
     <div id="screen-auth">
-        <div class="input-group">
-            <label>NAME (名前)</label>
-            <input type="text" id="in-name" autocomplete="off">
-        </div>
-        <div class="input-group">
-            <label>WORD (信念)</label>
-            <input type="text" id="in-word" autocomplete="off">
-        </div>
+        <input type="text" id="in-name" class="auth-input" placeholder="NAME (名前)" autocomplete="off">
+        <input type="text" id="in-word" class="auth-input" placeholder="WORD (信念)" autocomplete="off">
         
-        <div style="margin-bottom:10px; font-size:0.8rem; color:#666;">DRAW YOUR SIGIL (印を結べ)</div>
-        
+        <div style="font-size:0.7rem; color:#666;">DRAW SIGIL (印)</div>
         <div id="pattern-container">
             <canvas id="lock-canvas" width="300" height="300"></canvas>
         </div>
     </div>
 
-    <!-- 3. TERMINAL -->
-    <div id="screen-term">
-        <div class="line">PITHOS OS [ONLINE]</div>
-        <div class="line">------------------</div>
-        <div id="history"></div>
-        <div style="display:flex;">
-            <span class="prompt" id="prompt-txt">&gt;</span>
-            <input type="text" id="cmd" autocomplete="off">
+    <!-- 3. MAIN OS -->
+    <div id="screen-main" class="hidden">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div id="btn-audit" class="nav-btn active" onclick="switchMod('audit')" title="Auditor"><i class="fas fa-eye"></i></div>
+            <div id="btn-yorbee" class="nav-btn" onclick="switchMod('yorbee')" title="Yorbee"><i class="fas fa-users"></i></div>
+            <div id="btn-gcart" class="nav-btn" onclick="switchMod('gcart')" title="G-Cart"><i class="fas fa-building"></i></div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="header">
+                <div>PITHOS OS <span style="font-size:0.7rem; border:1px solid #fff; padding:1px 4px; margin-left:5px;">v2.0</span></div>
+                <div class="user-id" id="disp-uid">OFFLINE</div>
+            </div>
+
+            <!-- MODULE: AUDITOR -->
+            <div id="m-audit" class="module active">
+                <div class="card">
+                    <div class="card-title">SBCM SCANNER</div>
+                    <label>TARGET NAME</label>
+                    <input type="text" id="a-target" placeholder="例: 駅前モニュメント">
+                    <label>BUDGET (JPY)</label>
+                    <input type="number" id="a-budget" placeholder="30000000">
+                    <label>USERS (DAILY)</label>
+                    <input type="number" id="a-users" placeholder="5">
+                    
+                    <button class="btn-action" py-click="audit">CALCULATE & COMMIT</button>
+                </div>
+                <div class="card">
+                    <div class="card-title">LATEST RESULT</div>
+                    <div id="a-res" style="font-size:1.5rem;">READY</div>
+                </div>
+            </div>
+
+            <!-- MODULE: YORBEE -->
+            <div id="m-yorbee" class="module">
+                <div class="card">
+                    <div class="card-title">ACTIVE QUESTS (Global)</div>
+                    <ul style="padding-left:20px; font-size:0.9rem; color:#ccc;">
+                        <li style="margin-bottom:5px;">ROAD REPAIR [KASHIWA] - ¥50,000</li>
+                        <li style="margin-bottom:5px;">DATA CLEANING [TOKYO] - ¥30,000</li>
+                        <li style="margin-bottom:5px;">SNOW REMOVAL [SAPPORO] - ¥120,000</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <div class="card-title">CREATE QUEST</div>
+                    <label>QUEST TITLE</label>
+                    <input type="text" id="y-title" placeholder="JOB TITLE">
+                    <button class="btn-action" py-click="post_job">POST TO NETWORK</button>
+                </div>
+            </div>
+
+            <!-- MODULE: G-CART -->
+            <div id="m-gcart" class="module">
+                <div class="card">
+                    <div class="card-title">COMPANY STATUS</div>
+                    <div>CAPACITY: ¥30,000,000</div>
+                    <div>RATING: A (Safe)</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">AUTO BID (JV)</div>
+                    <label>SELECT TENDER</label>
+                    <select id="g-sel">
+                        <option>SCHOOL RENOVATION (¥50M)</option>
+                        <option>PIPE MAINTENANCE (¥12M)</option>
+                    </select>
+                    <button class="btn-action" py-click="bid">EXECUTE BID</button>
+                </div>
+            </div>
+
+            <!-- System Log -->
+            <div class="console" id="sys-log">
+                <div class="log-entry">SYSTEM BOOT SEQUENCE...</div>
+            </div>
         </div>
     </div>
 
-    <!-- PATTERN LOCK LOGIC (JS) -->
+    <!-- JS: PATTERN LOCK -->
     <script>
-        let patternPath = [];
-        let isDrawing = false;
-        const canvas = document.getElementById('lock-canvas');
-        const ctx = canvas.getContext('2d');
-        const dots = [];
-        
-        // Grid Config
-        const gridSize = 3;
-        const padding = 50;
-        const spacing = 100;
+        let pPath=[], isD=false;
+        const cvs=document.getElementById('lock-canvas'), ctx=cvs.getContext('2d');
+        const dots=[]; for(let r=0;r<3;r++)for(let c=0;c<3;c++) dots.push({x:50+c*100,y:50+r*100,id:r*3+c});
 
-        // Init Dots
-        for(let r=0; r<gridSize; r++){
-            for(let c=0; c<gridSize; c++){
-                dots.push({ x: padding + c*spacing, y: padding + r*spacing, id: r*3+c });
-            }
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw Connections
-            if (patternPath.length > 1) {
-                ctx.beginPath();
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = '#fff';
-                ctx.moveTo(dots[patternPath[0]].x, dots[patternPath[0]].y);
-                for (let i = 1; i < patternPath.length; i++) {
-                    ctx.lineTo(dots[patternPath[i]].x, dots[patternPath[i]].y);
-                }
+        function dr(){
+            ctx.clearRect(0,0,300,300);
+            if(pPath.length>1){
+                ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='#fff';
+                ctx.moveTo(dots[pPath[0]].x, dots[pPath[0]].y);
+                for(let i=1;i<pPath.length;i++) ctx.lineTo(dots[pPath[i]].x, dots[pPath[i]].y);
                 ctx.stroke();
             }
-
-            // Draw Dots
-            dots.forEach(d => {
-                ctx.beginPath();
-                // Highlight active dots
-                if (patternPath.includes(d.id)) {
-                    ctx.fillStyle = '#fff';
-                    ctx.arc(d.x, d.y, 8, 0, Math.PI*2);
-                } else {
-                    ctx.fillStyle = '#333';
-                    ctx.arc(d.x, d.y, 4, 0, Math.PI*2);
-                }
-                ctx.fill();
+            dots.forEach(d=>{
+                ctx.beginPath(); ctx.fillStyle=pPath.includes(d.id)?'#fff':'#333';
+                ctx.arc(d.x,d.y, pPath.includes(d.id)?6:3, 0,Math.PI*2); ctx.fill();
             });
         }
-
-        function getDot(x, y) {
-            return dots.find(d => Math.hypot(d.x - x, d.y - y) < 30);
+        function proc(e){
+            const r=cvs.getBoundingClientRect();
+            const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+            const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+            const d=dots.find(dt=>Math.hypot(dt.x-x,dt.y-y)<30);
+            if(d && !pPath.includes(d.id)){ pPath.push(d.id); dr(); }
         }
-
-        function start(e) {
-            isDrawing = true;
-            patternPath = [];
-            process(e);
-        }
-
-        function move(e) {
-            if (!isDrawing) return;
-            e.preventDefault(); // Stop scroll
-            process(e);
-        }
-
-        function process(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            const x = clientX - rect.left;
-            const y = clientY - rect.top;
-
-            const dot = getDot(x, y);
-            if (dot && !patternPath.includes(dot.id)) {
-                patternPath.push(dot.id);
-                draw();
-            }
-        }
-
-        function end() {
-            if (!isDrawing) return;
-            isDrawing = false;
-            
-            if (patternPath.length >= 4) { // Minimum 4 dots
-                // Pass to Python
-                const name = document.getElementById('in-name').value;
-                const word = document.getElementById('in-word').value;
-                const patternStr = patternPath.join("-");
-                
-                if(name && word){
-                    // Call Python function (via hidden button or event dispatch)
-                    window.onLoginTrigger(name, word, patternStr);
-                } else {
-                    alert("NAMEとWORDを入力してください");
-                    patternPath = []; draw();
-                }
-            } else {
-                patternPath = []; draw(); // Reset if too short
-            }
-        }
-
-        // Event Listeners
-        canvas.addEventListener('mousedown', start);
-        canvas.addEventListener('mousemove', move);
-        canvas.addEventListener('mouseup', end);
-        
-        canvas.addEventListener('touchstart', start);
-        canvas.addEventListener('touchmove', move);
-        canvas.addEventListener('touchend', end);
-
-        // Initial Draw
-        draw();
-
-        // UI Transition
-        function toAuth() {
-            document.getElementById('screen-void').classList.add('hidden');
-            document.getElementById('screen-auth').style.display = 'flex';
-            document.getElementById('in-name').focus();
-        }
+        cvs.addEventListener('mousedown',e=>{isD=true;pPath=[];proc(e)});
+        cvs.addEventListener('mousemove',e=>{if(isD){e.preventDefault();proc(e)}});
+        cvs.addEventListener('mouseup',e=>{
+            isD=false;
+            if(pPath.length>=4) window.onSigil(document.getElementById('in-name').value, document.getElementById('in-word').value, pPath.join("-"));
+            else {pPath=[];dr();}
+        });
+        cvs.addEventListener('touchstart',e=>{isD=true;pPath=[];proc(e)});
+        cvs.addEventListener('touchmove',e=>{if(isD){e.preventDefault();proc(e)}});
+        cvs.addEventListener('touchend',e=>{
+            isD=false;
+            if(pPath.length>=4) window.onSigil(document.getElementById('in-name').value, document.getElementById('in-word').value, pPath.join("-"));
+            else {pPath=[];dr();}
+        });
+        dr();
+        function toAuth(){ document.getElementById('screen-void').classList.add('hidden'); document.getElementById('screen-auth').style.display='flex'; }
     </script>
 
     <!-- PYTHON LOGIC -->
     <script type="py">
         from pyscript import document
         from pyodide.ffi import create_proxy
-        import js
-        import hashlib
-        import asyncio
+        import js, hashlib
+        from datetime import datetime
 
-        state = {"user": None}
+        def log(m):
+            t = datetime.now().strftime('%H:%M:%S')
+            c = document.getElementById("sys-log")
+            c.innerHTML = f"<div class='log-entry'><span class='log-time'>[{t}]</span>{m}</div>" + c.innerHTML
 
-        # --- AUTH LOGIC ---
-        def login_handler(name, word, pattern):
-            # THE RITUAL: Name + Word + Sigil = Key
-            seed = f"PITHOS_SIGIL_{name}_{word}_{pattern}"
-            pk_hex = hashlib.sha256(seed.encode('utf-8')).hexdigest()
-            
-            pub = js.js_set_key(pk_hex)
-            if pub:
-                state["user"] = name
-                # Transition to Terminal
-                document.getElementById('screen-auth').style.display = 'none'
-                document.getElementById('screen-term').style.display = 'block'
-                
-                print_ln(f"IDENTITY GENERATED: {name.upper()}")
-                print_ln(f"SIGIL ACCEPTED: {pattern}")
-                print_ln(f"KEY: {pub[:16]}...")
-                set_prompt(f"{name}@PITHOS:~#")
-                document.getElementById("cmd").focus()
-
-        # Bind JS trigger to Python function
-        js.window.onLoginTrigger = create_proxy(login_handler)
-
-        # --- TERMINAL LOGIC ---
-        def print_ln(text):
-            h = document.getElementById("history")
-            d = document.createElement("div")
-            d.className = "line"
-            d.innerText = text
-            h.appendChild(d)
-            # Auto scroll
-            term = document.getElementById("screen-term")
-            term.scrollTop = term.scrollHeight
-
-        def set_prompt(t): document.getElementById("prompt-txt").innerText = t
-
-        async def on_enter(e):
-            if e.key != "Enter": return
-            val = e.target.value.strip()
-            e.target.value = ""
-            print_ln(f"{document.getElementById('prompt-txt').innerText} {val}")
-            
-            if val == "clear":
-                document.getElementById("history").innerHTML = ""
+        def on_sigil_py(name, word, pattern):
+            if not name or not word:
+                log("AUTH ERROR: NAME/WORD MISSING")
                 return
-                
-            parts = val.split(" ")
-            cmd = parts[0].lower()
-
-            if cmd == "audit":
-                try:
-                    b = float(parts[1]); u = float(parts[2]); t = " ".join(parts[3:])
-                    if u==0: u=1
-                    d = b / 30000000 / (u / 72000)
-                    res = "SAFE" if d < 10 else "SCAM"
-                    print_ln(f"AUDITING {t}...")
-                    print_ln(f"D_INDEX: {d:.2f} -> {res}")
-                    eid = await js.js_pub(1, f"AUDIT: {t}\nD:{d:.1f}\n#{res}", [["t","SBCM"]])
-                    print_ln(f"BROADCAST: {eid[:8]}")
-                except: print_ln("ERR: audit [yen] [ppl] [name]")
-
-            elif cmd == "job":
-                t = " ".join(parts[1:])
-                eid = await js.js_pub(1, f"JOB: {t}\n#SBCM_JOB", [["t","SBCM_JOB"]])
-                print_ln(f"JOB POSTED: {eid[:8]}")
-
-            elif cmd == "logout":
-                js.location.reload()
             
-            else:
-                print_ln("UNKNOWN COMMAND. (audit, job, logout)")
+            # Key Gen
+            seed = f"SBCM_V2_{name}_{word}_{pattern}"
+            pk_hex = hashlib.sha256(seed.encode('utf-8')).hexdigest()
+            pub = js.js_set_key(pk_hex)
+            
+            if pub:
+                # Transition
+                document.getElementById('screen-auth').style.display = 'none'
+                document.getElementById('screen-main').style.display = 'flex'
+                
+                # Display
+                short = f"{pub[:4]}...{pub[-4:]}"
+                document.getElementById('disp-uid').innerText = f"{name.upper()} :: {short}"
+                log(f"IDENTITY CONFIRMED: {name}")
+                log("CONNECTED TO NOSTR RELAYS.")
 
-        document.getElementById("cmd").onkeypress = create_proxy(on_enter)
+        js.window.onSigil = create_proxy(on_sigil_py)
+
+        async def audit(e):
+            try:
+                b = float(document.getElementById("a-budget").value)
+                u = float(document.getElementById("a-users").value)
+                t = document.getElementById("a-target").value
+                if u==0: u=1
+                d = b/30000000/(u/72000)
+                v = "SAFE" if d<10 else "SCAM"
+                
+                document.getElementById("a-res").innerText = f"D: {d:.2f} [{v}]"
+                eid = await js.js_pub(1, f"AUDIT: {t}\nD:{d:.2f}\n#{v}", [["t","SBCM_AUDIT"]])
+                log(f"AUDIT COMMITTED: {eid[:8]}")
+            except: log("INPUT ERROR")
+
+        async def post_job(e):
+            t = document.getElementById("y-title").value
+            eid = await js.js_pub(1, f"JOB: {t}\n#SBCM_JOB", [["t","SBCM_JOB"]])
+            log(f"JOB POSTED: {eid[:8]}")
+
+        async def bid(e):
+            t = document.getElementById("g-sel").value
+            eid = await js.js_pub(1, f"BID: {t}\n#SBCM_BID", [["t","SBCM_BID"]])
+            log(f"BID SUBMITTED: {eid[:8]}")
 
     </script>
 </body>
