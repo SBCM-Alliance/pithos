@@ -3,145 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pithos OS | The Logic Shelter</title>
-    
-    <!-- PyScript -->
+    <title>Pithos OS | Decentralized Governance</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
-
+    <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- Pithos Dark Theme --- */
-        :root { --bg: #0a0a0a; --fg: #e0e0e0; --accent: #00ff41; --danger: #ff4b4b; --warn: #ffd700; }
-        body { background-color: var(--bg); color: var(--fg); font-family: 'Courier New', monospace; margin: 0; padding: 20px; line-height: 1.6; }
-        
-        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 5px; }
-        .subtitle { color: #888; font-size: 0.9em; margin-bottom: 30px; font-style: italic; }
-        
-        /* Tabs */
-        .tab-buttons { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 20px; }
-        .tab-btn { background: #222; border: 1px solid #444; color: var(--fg); padding: 10px 20px; cursor: pointer; white-space: nowrap; }
-        .tab-btn.active { border-color: var(--accent); color: var(--accent); font-weight: bold; }
-        
-        /* Sections */
-        .module-section { display: none; animation: fadeIn 0.3s; }
-        .module-section.active { display: block; }
-        
-        /* Inputs & Cards */
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-size: 0.8em; color: #888; }
-        input, select { background: #111; border: 1px solid #444; color: white; padding: 8px; width: 100%; box-sizing: border-box; font-family: inherit; }
-        button.action-btn { background: var(--fg); color: var(--bg); border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
-        button.action-btn:hover { background: var(--accent); }
-        button.danger-btn { background: var(--danger); color: white; }
-
-        /* Output Areas */
-        .console-output { background: #000; border: 1px solid #333; padding: 15px; margin-top: 20px; min-height: 50px; white-space: pre-wrap; word-break: break-all; }
-        .status-ok { color: var(--accent); }
-        .status-warn { color: var(--warn); }
-        .status-err { color: var(--danger); }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        :root { --bg: #050505; --sidebar: #111; --text: #e0e0e0; --accent: #00ff41; --yorbee: #4ECDC4; --gcart: #ffd700; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 80px; background: var(--sidebar); display: flex; flex-direction: column; align-items: center; padding-top: 20px; border-right: 1px solid #333; z-index: 10; }
+        .nav-btn { width: 50px; height: 50px; margin-bottom: 20px; border-radius: 12px; border: 1px solid #333; background: #000; color: #555; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .nav-btn.active { background: #222; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        .nav-btn.mode-audit.active { color: var(--accent); border-color: var(--accent); }
+        .nav-btn.mode-yorbee.active { color: var(--yorbee); border-color: var(--yorbee); }
+        .nav-btn.mode-gcart.active { color: var(--gcart); border-color: var(--gcart); }
+        .main { flex: 1; padding: 20px; overflow-y: auto; }
+        .module { display: none; animation: fadeIn 0.3s; }
+        .module.active { display: block; }
+        .card { background: #111; padding: 20px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px; }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; background: #000; border: 1px solid #444; color: white; font-family: inherit; box-sizing: border-box; }
+        .action-btn { width: 100%; padding: 12px; border: none; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
+        .btn-audit { background: var(--accent); color: black; }
+        .btn-yorbee { background: var(--yorbee); color: black; }
+        .btn-gcart { background: var(--gcart); color: black; }
+        .console { background: #000; color: #aaa; padding: 10px; border: 1px dashed #333; font-size: 0.8rem; height: 150px; overflow-y: scroll; }
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 99; display: flex; align-items: center; justify-content: center; }
+        .login-box { width: 300px; text-align: center; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
+    <script>
+        let sk = null; let pk = null; const relays = ['wss://relay.damus.io', 'wss://nos.lol'];
+        function js_login(nsec) { try { if(nsec) sk=nsec; else sk=window.NostrTools.generatePrivateKey(); pk=window.NostrTools.getPublicKey(sk); return pk; } catch(e){return null;} }
+        async function js_publish(kind, content, tags) { if(!sk) return "No Key"; const ev={kind:kind, pubkey:pk, created_at:Math.floor(Date.now()/1000), tags:tags, content:content}; ev.id=window.NostrTools.getEventHash(ev); ev.sig=window.NostrTools.signEvent(ev,sk); const pool=new window.NostrTools.SimplePool(); pool.publish(relays,ev); return ev.id; }
+        function switchMod(id) { document.querySelectorAll('.module').forEach(el=>el.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active')); document.getElementById('mod-'+id).classList.add('active'); document.querySelector('.nav-btn.mode-'+id).classList.add('active'); }
+    </script>
 </head>
 <body>
-
-    <h1>⚖️ Pithos OS</h1>
-    <div class="subtitle">"Part of that power which eternally wills evil and eternally works good."</div>
-
-    <!-- Navigation -->
-    <div class="tab-buttons">
-        <button class="tab-btn active" onclick="openTab('core')">📊 Core</button>
-        <button class="tab-btn" onclick="openTab('treasurer')">💰 Treasurer</button>
-        <button class="tab-btn" onclick="openTab('sphinx')">👁️ Sphinx</button>
-        <button class="tab-btn" onclick="openTab('ostraka')">🏺 Ostraka</button>
+    <div id="login-overlay"><div class="login-box card"><h1>🏺 Pithos OS</h1><p style="color:#888;">Boot Sequence</p><input type="password" id="nsec-input" placeholder="nsec key (Optional)"><button class="action-btn btn-audit" py-click="do_login">🔑 BOOT SYSTEM</button></div></div>
+    <div class="sidebar">
+        <div class="nav-btn mode-audit active" onclick="switchMod('audit')"><i class="fas fa-eye"></i></div>
+        <div class="nav-btn mode-yorbee" onclick="switchMod('yorbee')"><i class="fas fa-users"></i></div>
+        <div class="nav-btn mode-gcart" onclick="switchMod('gcart')"><i class="fas fa-building"></i></div>
     </div>
-
-    <!-- 1. CORE MODULE -->
-    <div id="core" class="module-section active">
-        <h3>SBCM Auditor (歪み計算)</h3>
-        <div class="input-group">
-            <label>自治体人口 (人)</label>
-            <input type="number" id="core-pop" value="435000">
-        </div>
-        <div class="input-group">
-            <label>事業予算 (円)</label>
-            <input type="number" id="core-budget" value="100000000">
-        </div>
-        <div class="input-group">
-            <label>推定利用者数 (人)</label>
-            <input type="number" id="core-users" value="3000">
-        </div>
-        <button class="action-btn" py-click="run_core">CALCULATE DISTORTION</button>
-        <div id="core-result" class="console-output">Ready...</div>
+    <div class="main">
+        <div id="mod-audit" class="module active"><h2 style="color:var(--accent);">👁️ AUDITOR</h2><div class="card"><label>📍 City & Target</label><input type="text" id="audit-target" placeholder="柏市 駅前モニュメント"><label>💸 Budget</label><input type="number" id="audit-budget" placeholder="30000000"><label>👥 Users</label><input type="number" id="audit-users" placeholder="5"><button class="action-btn btn-audit" py-click="run_audit">🔍 SCAN & REPORT</button></div><div id="audit-result" style="color:var(--accent);font-weight:bold;"></div></div>
+        <div id="mod-yorbee" class="module"><h2 style="color:var(--yorbee);">⚔️ YORBEE</h2><div class="card"><p>Active Quests</p><div style="border-left:2px solid var(--yorbee);padding-left:10px;"><div style="font-size:0.9rem;">柏市道路補修</div><div style="color:#888;font-size:0.8rem;">¥50,000</div></div></div><div class="card"><label>Post Job</label><input type="text" id="job-title" placeholder="Job Title"><button class="action-btn btn-yorbee" py-click="post_job">📝 POST</button></div></div>
+        <div id="mod-gcart" class="module"><h2 style="color:var(--gcart);">🏗️ G-CART</h2><div class="card"><p>Capacity: <b style="color:var(--gcart);">¥30,000,000</b></p></div><div class="card"><label>Auto Bid</label><select id="tender-select"><option>柏市第3小学校 改修 (¥5,000万)</option></select><button class="action-btn btn-gcart" py-click="submit_bid">⚡ AUTO BID</button></div></div>
+        <h3>📟 Console</h3><div class="console" id="sys-log">[SYSTEM] Ready...</div>
     </div>
-
-    <!-- 2. TREASURER MODULE -->
-    <div id="treasurer" class="module-section">
-        <h3>Iron Vault (自動金庫)</h3>
-        <div class="input-group">
-            <label>チーム名 (Team ID)</label>
-            <input type="text" id="tr-team" value="Kashiwa-Road-JV">
-        </div>
-        <div class="input-group">
-            <label>報酬額 (円)</label>
-            <input type="number" id="tr-amount" value="500000">
-        </div>
-        <button class="action-btn" py-click="run_treasurer">GENERATE ZENGIN CSV</button>
-        <div id="tr-result" class="console-output">Waiting for input...</div>
-    </div>
-
-    <!-- 3. SPHINX MODULE -->
-    <div id="sphinx" class="module-section">
-        <h3>Project Sphinx (市民監査)</h3>
-        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-            <div style="flex:1; background:#222; padding:10px; text-align:center;">
-                <div>📸 BEFORE</div>
-                <div style="font-size:2em;">🕳️</div>
-            </div>
-            <div style="flex:1; background:#222; padding:10px; text-align:center;">
-                <div>📸 AFTER</div>
-                <div style="font-size:2em;" id="sphinx-img">❓</div>
-            </div>
-        </div>
-        <button class="action-btn" py-click="load_quest" style="margin-bottom:10px; background:#333; color:#fff;">↻ Load New Quest</button>
-        
-        <div style="display: flex; gap: 10px;">
-            <button class="action-btn" style="background:var(--accent); color:#000;" py-click="sphinx_verify">✅ VERIFY</button>
-            <button class="action-btn" style="background:var(--danger); color:#fff;" py-click="sphinx_reject">❌ REJECT</button>
-        </div>
-        <div id="sphinx-result" class="console-output">Quest loaded. Awaiting judgment.</div>
-    </div>
-
-    <!-- 4. OSTRAKA MODULE -->
-    <div id="ostraka" class="module-section">
-        <h3>Digital Ostraka (陶片追放)</h3>
-        <div class="input-group">
-            <label>追放対象ID (Target)</label>
-            <input type="text" id="os-target" value="Governor_Tanaka">
-        </div>
-        <div class="input-group">
-            <label>罪状 (Crime)</label>
-            <select id="os-reason">
-                <option>ハコモノ乱造 (High D_index)</option>
-                <option>データ改ざん (Fraud)</option>
-                <option>癒着 (Collusion)</option>
-            </select>
-        </div>
-        <button class="action-btn danger-btn" py-click="cast_ostraka">CAST SHARD (投票)</button>
-        <div id="os-result" class="console-output">System ready.</div>
-    </div>
-
-    <!-- JS for Tabs -->
-    <script>
-        function openTab(id) {
-            document.querySelectorAll('.module-section').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            event.target.classList.add('active');
-        }
+    <script type="py">
+        from pyscript import document
+        import js
+        from datetime import datetime
+        def log(msg): c=document.getElementById("sys-log"); c.innerHTML=f"<div>[{datetime.now().strftime('%H:%M:%S')}] {msg}</div>"+c.innerHTML
+        def do_login(e): 
+            pk=js.js_login(document.getElementById("nsec-input").value)
+            if pk: document.getElementById("login-overlay").style.display="none"; log(f"Logged in: {pk[:8]}..."); log("Connected to Nostr.")
+        async def run_audit(e):
+            try: b=float(document.getElementById("audit-budget").value); u=float(document.getElementById("audit-users").value)
+            except: log("Error"); return
+            d=b/30000000/(u/72000); v="SAFE" if d<10 else "SCAM"
+            document.getElementById("audit-result").innerText=f"D_index: {d:.1f} ({v})"
+            eid=await js.js_publish(1, f"【SBCM】{document.getElementById('audit-target').value}\nD:{d:.1f}\n#{v}", [["t","SBCM_AUDIT"]])
+            log(f"Audit Sent: {eid[:8]}")
+        async def post_job(e): eid=await js.js_publish(1, f"【Yorbee】{document.getElementById('job-title').value}", [["t","SBCM_JOB"]]); log(f"Job Posted: {eid[:8]}")
+        async def submit_bid(e): eid=await js.js_publish(1, f"【G-Cart】Bid: {document.getElementById('tender-select').value}", [["t","SBCM_BID"]]); log(f"Bid Sent: {eid[:8]}")
     </script>
-
-    <!-- Load Python Logic -->
-    <script type="py" src="./pithos.py" config='{"packages": []}'></script>
-  </body>
+</body>
 </html>
