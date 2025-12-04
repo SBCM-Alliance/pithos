@@ -26,21 +26,35 @@
             margin: 0;
             background: var(--bg);
             color: var(--fg);
-            font-family: 'JetBrains Mono', monospace;
-            height: 100vh;
+            font-family: 'JetBrains Mono', monospace; /* Fallback included */
+            height: 100dvh; /* Mobile Friendly Height */
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none;
         }
 
         /* --- UTILS --- */
         .hidden { display: none !important; }
-        .blink { animation: blink 2s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .blink { animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* --- SCREEN 0: LOADER (Plain CSS) --- */
+        #screen-loader {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
+            z-index: 100; position: absolute; top: 0; left: 0; width: 100%; background: #000;
+        }
+        .loading-bar { width: 200px; height: 2px; background: #333; margin-top: 10px; position: relative; overflow: hidden; }
+        .loading-bar::after {
+            content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 50%; background: #fff;
+            animation: load 1s infinite ease-in-out;
+        }
+        @keyframes load { 0% { left: -50%; } 100% { left: 100%; } }
 
         /* --- SCREEN 1: VOID --- */
         #screen-void {
-            display: flex; align-items: center; justify-content: center; height: 100%;
-            font-size: 1.2rem; cursor: pointer;
+            display: none; /* Python will show this */
+            align-items: center; justify-content: center; height: 100%;
+            font-size: 1.2rem; cursor: pointer; width: 100%;
         }
 
         /* --- SCREEN 2: AUTH (Ritual) --- */
@@ -50,19 +64,19 @@
         .auth-input {
             background: transparent; border: none; border-bottom: 1px solid var(--dim);
             color: var(--fg); font-family: inherit; font-size: 1.2rem; padding: 10px;
-            width: 280px; margin-bottom: 30px; outline: none; text-align: center;
+            width: 280px; margin-bottom: 30px; outline: none; text-align: center; border-radius: 0;
         }
         .auth-input:focus { border-bottom: 1px solid var(--fg); }
         #pattern-container { position: relative; width: 300px; height: 300px; touch-action: none; margin-top: 20px;}
 
         /* --- SCREEN 3: DASHBOARD (Main) --- */
         #screen-main {
-            display: none; height: 100%; display: flex; /* Flex is set by JS later */
+            display: none; height: 100%; display: flex;
         }
 
         /* Sidebar */
         .sidebar {
-            width: 70px; border-right: var(--border);
+            width: 60px; border-right: var(--border);
             display: flex; flex-direction: column; align-items: center; padding-top: 30px;
         }
         .nav-btn {
@@ -75,11 +89,11 @@
         .nav-btn.active { color: var(--fg); border: var(--active-border); }
 
         /* Content Area */
-        .content { flex: 1; padding: 30px; overflow-y: auto; position: relative; }
+        .content { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
         
         .header {
             display: flex; justify-content: space-between; border-bottom: var(--border);
-            padding-bottom: 15px; margin-bottom: 30px;
+            padding-bottom: 15px; margin-bottom: 20px;
         }
         .user-id { font-size: 0.8rem; color: var(--dim); }
 
@@ -88,36 +102,34 @@
         .module.active { display: block; }
 
         /* Cards & Forms */
-        .card {
-            border: var(--border); padding: 20px; margin-bottom: 20px;
-        }
+        .card { border: var(--border); padding: 15px; margin-bottom: 15px; }
         .card-title {
-            font-size: 0.9rem; color: var(--dim); margin-bottom: 15px; text-transform: uppercase;
+            font-size: 0.8rem; color: var(--dim); margin-bottom: 10px; text-transform: uppercase;
             border-bottom: 1px dashed #333; padding-bottom: 5px;
         }
 
         input, select {
             width: 100%; background: #000; color: #fff; border: var(--border);
-            padding: 12px; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;
-            outline: none;
+            padding: 10px; margin-bottom: 10px; font-family: inherit; box-sizing: border-box;
+            outline: none; border-radius: 0; -webkit-appearance: none;
         }
         input:focus, select:focus { border: var(--active-border); }
 
         label { display: block; font-size: 0.7rem; color: var(--dim); margin-bottom: 5px; }
 
         .btn-action {
-            width: 100%; padding: 15px; background: #000; color: #fff;
+            width: 100%; padding: 12px; background: #000; color: #fff;
             border: var(--active-border); font-weight: bold; cursor: pointer;
-            text-transform: uppercase; transition: 0.2s;
+            text-transform: uppercase; transition: 0.2s; border-radius: 0;
         }
         .btn-action:hover { background: #fff; color: #000; }
 
         /* Console Log */
         .console {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            height: 120px; border-top: var(--border); background: #000;
+            margin-top: 20px;
+            border-top: var(--border); background: #000;
             padding: 10px; box-sizing: border-box; overflow-y: auto;
-            font-size: 0.75rem; color: var(--dim);
+            font-size: 0.7rem; color: var(--dim); height: 100px;
         }
         .log-entry { margin-bottom: 2px; }
         .log-time { color: #444; margin-right: 5px; }
@@ -142,9 +154,15 @@
 </head>
 <body>
 
+    <!-- 0. LOADER (Visible until Python loads) -->
+    <div id="screen-loader">
+        <div style="font-size: 0.8rem; letter-spacing: 2px;">INITIALIZING PITHOS...</div>
+        <div class="loading-bar"></div>
+    </div>
+
     <!-- 1. VOID -->
     <div id="screen-void" onclick="toAuth()">
-        <span class="blink">&gt; login:</span>
+        <span class="blink">&gt; login: TAP TO START</span>
     </div>
 
     <!-- 2. AUTH (Ritual) -->
@@ -197,10 +215,9 @@
             <div id="m-yorbee" class="module">
                 <div class="card">
                     <div class="card-title">ACTIVE QUESTS (Global)</div>
-                    <ul style="padding-left:20px; font-size:0.9rem; color:#ccc;">
+                    <ul style="padding-left:20px; font-size:0.8rem; color:#ccc;">
                         <li style="margin-bottom:5px;">ROAD REPAIR [KASHIWA] - ¥50,000</li>
                         <li style="margin-bottom:5px;">DATA CLEANING [TOKYO] - ¥30,000</li>
-                        <li style="margin-bottom:5px;">SNOW REMOVAL [SAPPORO] - ¥120,000</li>
                     </ul>
                 </div>
                 <div class="card">
@@ -216,7 +233,6 @@
                 <div class="card">
                     <div class="card-title">COMPANY STATUS</div>
                     <div>CAPACITY: ¥30,000,000</div>
-                    <div>RATING: A (Safe)</div>
                 </div>
                 <div class="card">
                     <div class="card-title">AUTO BID (JV)</div>
@@ -231,7 +247,7 @@
 
             <!-- System Log -->
             <div class="console" id="sys-log">
-                <div class="log-entry">SYSTEM BOOT SEQUENCE...</div>
+                <div class="log-entry">SYSTEM BOOTING...</div>
             </div>
         </div>
     </div>
@@ -262,22 +278,25 @@
             const d=dots.find(dt=>Math.hypot(dt.x-x,dt.y-y)<30);
             if(d && !pPath.includes(d.id)){ pPath.push(d.id); dr(); }
         }
-        cvs.addEventListener('mousedown',e=>{isD=true;pPath=[];proc(e)});
-        cvs.addEventListener('mousemove',e=>{if(isD){e.preventDefault();proc(e)}});
-        cvs.addEventListener('mouseup',e=>{
+        // Mouse & Touch Events
+        const start = e => { isD=true; pPath=[]; proc(e); };
+        const move = e => { if(isD){ e.preventDefault(); proc(e); } };
+        const end = e => {
             isD=false;
             if(pPath.length>=4) window.onSigil(document.getElementById('in-name').value, document.getElementById('in-word').value, pPath.join("-"));
-            else {pPath=[];dr();}
-        });
-        cvs.addEventListener('touchstart',e=>{isD=true;pPath=[];proc(e)});
-        cvs.addEventListener('touchmove',e=>{if(isD){e.preventDefault();proc(e)}});
-        cvs.addEventListener('touchend',e=>{
-            isD=false;
-            if(pPath.length>=4) window.onSigil(document.getElementById('in-name').value, document.getElementById('in-word').value, pPath.join("-"));
-            else {pPath=[];dr();}
-        });
+            else { pPath=[]; dr(); }
+        };
+
+        cvs.addEventListener('mousedown', start); cvs.addEventListener('touchstart', start);
+        cvs.addEventListener('mousemove', move); cvs.addEventListener('touchmove', move);
+        cvs.addEventListener('mouseup', end); cvs.addEventListener('touchend', end);
+        
         dr();
-        function toAuth(){ document.getElementById('screen-void').classList.add('hidden'); document.getElementById('screen-auth').style.display='flex'; }
+        
+        function toAuth(){ 
+            document.getElementById('screen-void').style.display='none'; 
+            document.getElementById('screen-auth').style.display='flex'; 
+        }
     </script>
 
     <!-- PYTHON LOGIC -->
@@ -287,10 +306,18 @@
         import js, hashlib
         from datetime import datetime
 
+        # BOOT COMPLETE HANDLER
+        def boot():
+            # Hide Loader, Show Void
+            document.getElementById('screen-loader').style.display = 'none'
+            document.getElementById('screen-void').style.display = 'flex'
+            log("SYSTEM READY. WAITING FOR INPUT.")
+
         def log(m):
             t = datetime.now().strftime('%H:%M:%S')
             c = document.getElementById("sys-log")
-            c.innerHTML = f"<div class='log-entry'><span class='log-time'>[{t}]</span>{m}</div>" + c.innerHTML
+            if c:
+                c.innerHTML = f"<div class='log-entry'><span class='log-time'>[{t}]</span>{m}</div>" + c.innerHTML
 
         def on_sigil_py(name, word, pattern):
             if not name or not word:
@@ -338,6 +365,9 @@
             t = document.getElementById("g-sel").value
             eid = await js.js_pub(1, f"BID: {t}\n#SBCM_BID", [["t","SBCM_BID"]])
             log(f"BID SUBMITTED: {eid[:8]}")
+
+        # Execute Boot
+        boot()
 
     </script>
 </body>
