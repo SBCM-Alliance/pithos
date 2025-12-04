@@ -26,19 +26,14 @@
             margin: 0;
             background: var(--bg);
             color: var(--fg);
-            font-family: 'JetBrains Mono', monospace; /* Fallback included */
-            height: 100dvh; /* Mobile Friendly Height */
+            font-family: 'JetBrains Mono', monospace;
+            height: 100dvh;
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
         }
 
-        /* --- UTILS --- */
-        .hidden { display: none !important; }
-        .blink { animation: blink 1.5s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-        /* --- SCREEN 0: LOADER (Plain CSS) --- */
+        /* --- SCREEN 0: LOADER --- */
         #screen-loader {
             display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
             z-index: 100; position: absolute; top: 0; left: 0; width: 100%; background: #000;
@@ -52,14 +47,15 @@
 
         /* --- SCREEN 1: VOID --- */
         #screen-void {
-            display: none; /* Python will show this */
-            align-items: center; justify-content: center; height: 100%;
+            display: flex; align-items: center; justify-content: center; height: 100%;
             font-size: 1.2rem; cursor: pointer; width: 100%;
         }
+        .blink { animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
         /* --- SCREEN 2: AUTH (Ritual) --- */
         #screen-auth {
-            display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
         }
         .auth-input {
             background: transparent; border: none; border-bottom: 1px solid var(--dim);
@@ -71,7 +67,7 @@
 
         /* --- SCREEN 3: DASHBOARD (Main) --- */
         #screen-main {
-            display: none; height: 100%; display: flex;
+            height: 100%; display: flex; width: 100%;
         }
 
         /* Sidebar */
@@ -154,19 +150,19 @@
 </head>
 <body>
 
-    <!-- 0. LOADER (Visible until Python loads) -->
+    <!-- 0. LOADER -->
     <div id="screen-loader">
         <div style="font-size: 0.8rem; letter-spacing: 2px;">INITIALIZING PITHOS...</div>
         <div class="loading-bar"></div>
     </div>
 
-    <!-- 1. VOID -->
-    <div id="screen-void" onclick="toAuth()">
+    <!-- 1. VOID (Initially hidden by style) -->
+    <div id="screen-void" style="display: none;" onclick="toAuth()">
         <span class="blink">&gt; login: TAP TO START</span>
     </div>
 
-    <!-- 2. AUTH (Ritual) -->
-    <div id="screen-auth">
+    <!-- 2. AUTH (Initially hidden) -->
+    <div id="screen-auth" style="display: none;">
         <input type="text" id="in-name" class="auth-input" placeholder="NAME (名前)" autocomplete="off">
         <input type="text" id="in-word" class="auth-input" placeholder="WORD (信念)" autocomplete="off">
         
@@ -176,8 +172,8 @@
         </div>
     </div>
 
-    <!-- 3. MAIN OS -->
-    <div id="screen-main" class="hidden">
+    <!-- 3. MAIN OS (Initially hidden) -->
+    <div id="screen-main" style="display: none;">
         <!-- Sidebar -->
         <div class="sidebar">
             <div id="btn-audit" class="nav-btn active" onclick="switchMod('audit')" title="Auditor"><i class="fas fa-eye"></i></div>
@@ -215,7 +211,7 @@
             <div id="m-yorbee" class="module">
                 <div class="card">
                     <div class="card-title">ACTIVE QUESTS (Global)</div>
-                    <ul style="padding-left:20px; font-size:0.8rem; color:#ccc;">
+                    <ul style="padding-left:20px; font-size:0.9rem; color:#ccc;">
                         <li style="margin-bottom:5px;">ROAD REPAIR [KASHIWA] - ¥50,000</li>
                         <li style="margin-bottom:5px;">DATA CLEANING [TOKYO] - ¥30,000</li>
                     </ul>
@@ -308,67 +304,10 @@
 
         # BOOT COMPLETE HANDLER
         def boot():
-            # Hide Loader, Show Void
+            # Python is ready: Switch from Loader to Void
             document.getElementById('screen-loader').style.display = 'none'
             document.getElementById('screen-void').style.display = 'flex'
             log("SYSTEM READY. WAITING FOR INPUT.")
 
         def log(m):
-            t = datetime.now().strftime('%H:%M:%S')
-            c = document.getElementById("sys-log")
-            if c:
-                c.innerHTML = f"<div class='log-entry'><span class='log-time'>[{t}]</span>{m}</div>" + c.innerHTML
-
-        def on_sigil_py(name, word, pattern):
-            if not name or not word:
-                log("AUTH ERROR: NAME/WORD MISSING")
-                return
-            
-            # Key Gen
-            seed = f"SBCM_V2_{name}_{word}_{pattern}"
-            pk_hex = hashlib.sha256(seed.encode('utf-8')).hexdigest()
-            pub = js.js_set_key(pk_hex)
-            
-            if pub:
-                # Transition
-                document.getElementById('screen-auth').style.display = 'none'
-                document.getElementById('screen-main').style.display = 'flex'
-                
-                # Display
-                short = f"{pub[:4]}...{pub[-4:]}"
-                document.getElementById('disp-uid').innerText = f"{name.upper()} :: {short}"
-                log(f"IDENTITY CONFIRMED: {name}")
-                log("CONNECTED TO NOSTR RELAYS.")
-
-        js.window.onSigil = create_proxy(on_sigil_py)
-
-        async def audit(e):
-            try:
-                b = float(document.getElementById("a-budget").value)
-                u = float(document.getElementById("a-users").value)
-                t = document.getElementById("a-target").value
-                if u==0: u=1
-                d = b/30000000/(u/72000)
-                v = "SAFE" if d<10 else "SCAM"
-                
-                document.getElementById("a-res").innerText = f"D: {d:.2f} [{v}]"
-                eid = await js.js_pub(1, f"AUDIT: {t}\nD:{d:.2f}\n#{v}", [["t","SBCM_AUDIT"]])
-                log(f"AUDIT COMMITTED: {eid[:8]}")
-            except: log("INPUT ERROR")
-
-        async def post_job(e):
-            t = document.getElementById("y-title").value
-            eid = await js.js_pub(1, f"JOB: {t}\n#SBCM_JOB", [["t","SBCM_JOB"]])
-            log(f"JOB POSTED: {eid[:8]}")
-
-        async def bid(e):
-            t = document.getElementById("g-sel").value
-            eid = await js.js_pub(1, f"BID: {t}\n#SBCM_BID", [["t","SBCM_BID"]])
-            log(f"BID SUBMITTED: {eid[:8]}")
-
-        # Execute Boot
-        boot()
-
-    </script>
-</body>
-</html>
+            t = datetime.now().strftime('%H:%M:%
