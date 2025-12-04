@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pithos | Logic OS</title>
+    <title>Pithos | Dungeon Manager</title>
+    
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
@@ -11,319 +12,364 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
-        /* --- MONOCHROME RPG THEME --- */
-        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #333; --active: 1px solid #fff; }
+        /* --- MONOCHROME THEME --- */
+        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #fff; --active: 2px solid #fff; }
         body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; height: 100dvh; overflow: hidden; user-select: none; }
         
-        /* Utils */
         .hidden { display: none !important; }
-        .blink { animation: blink 1.5s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .blink { animation: blink 1s infinite step-end; }
+        @keyframes blink { 50% { opacity: 0; } }
 
-        /* Loader & Void & Auth (Same as before) */
+        /* LOADER & AUTH (Standard) */
         #screen-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: absolute; width: 100%; background: #000; z-index: 99; }
-        .loading-bar { width: 200px; height: 2px; background: #333; margin-top: 10px; position: relative; overflow: hidden; }
-        .loading-bar::after { content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 50%; background: #fff; animation: load 1s infinite ease-in-out; }
-        @keyframes load { 0% { left: -50%; } 100% { left: 100%; } }
-        
-        #screen-void { display: none; align-items: center; justify-content: center; height: 100%; font-size: 1.2rem; cursor: pointer; width: 100%; }
+        .loading-bar { width: 100px; height: 2px; background: #333; margin-top: 10px; } .loading-bar div { height: 100%; width: 50%; background: #fff; animation: load 1s infinite; } @keyframes load { 0% { margin-left: -50%; } 100% { margin-left: 100%; } }
+        #screen-void { display: none; align-items: center; justify-content: center; height: 100%; font-size: 1.2rem; cursor: pointer; }
         #screen-auth { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
         .auth-input { background: transparent; border: none; border-bottom: 1px solid var(--dim); color: var(--fg); font-size: 1.2rem; padding: 10px; width: 280px; margin-bottom: 30px; text-align: center; outline: none; }
-        #pattern-container { position: relative; width: 300px; height: 300px; margin-top: 20px;}
+        #pattern-container { margin-top: 20px; border: 1px dashed #333; }
 
-        /* Main UI */
-        #screen-main { display: none; height: 100%; width: 100%; }
-        .sidebar { width: 60px; border-right: var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 30px; }
-        .nav-btn { width: 40px; height: 40px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--dim); cursor: pointer; border: 1px solid transparent; }
-        .nav-btn.active { color: var(--fg); border: var(--active); }
-        .content { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
+        /* MAIN UI */
+        #screen-main { display: none; height: 100%; display: flex; flex-direction: column; }
+        .top-bar { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #333; }
+        .workspace { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+        .bottom-nav { display: flex; border-top: 1px solid #333; }
+        .nav-item { flex: 1; text-align: center; padding: 15px 0; cursor: pointer; border-right: 1px solid #333; }
+        .nav-item.active { background: #fff; color: #000; }
+
+        /* WINDOWS */
+        .window { border: 1px solid #fff; padding: 15px; margin-bottom: 15px; position: relative; }
+        .win-title { position: absolute; top: -10px; left: 10px; background: #000; padding: 0 5px; font-weight: bold; font-size: 0.8rem; }
+
+        /* RPG ELEMENTS */
+        .stat-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #444; padding: 5px 0; }
+        .btn { border: 1px solid #fff; background: #000; color: #fff; padding: 10px; cursor: pointer; font-weight: bold; text-align: center; width: 100%; box-sizing: border-box; }
+        .btn:hover { background: #fff; color: #000; }
+        input { background: #000; color: #fff; border: 1px solid #666; padding: 8px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+
+        /* --- DUNGEON & PROGRESS --- */
+        .hp-bar-frame { width: 100%; border: 1px solid #444; height: 15px; margin: 10px 0; position: relative; }
+        .hp-bar-fill { height: 100%; background: #fff; width: 0%; transition: width 0.3s; }
+        .hp-text { position: absolute; top: 0; left: 5px; font-size: 0.7rem; line-height: 15px; color: #888; mix-blend-mode: difference; }
+
+        .enemy-row { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px; border: 1px solid #333; margin-bottom: 5px; cursor: pointer; 
+        }
+        .enemy-row:hover { border-color: #fff; }
+        .enemy-row.defeated { opacity: 0.5; text-decoration: line-through; border-color: #222; }
         
-        .header { display: flex; justify-content: space-between; border-bottom: var(--border); padding-bottom: 15px; margin-bottom: 20px; }
-        .module { display: none; animation: fadeIn 0.3s; }
-        .module.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .battle-log { 
+            height: 100px; overflow-y: auto; border: 1px dashed #333; 
+            padding: 5px; font-size: 0.7rem; color: #888; margin-top: 10px; 
+        }
+        .log-line { margin-bottom: 2px; }
 
-        /* RPG UI ELEMENTS */
-        .rpg-box { border: 1px solid #fff; padding: 10px; margin-bottom: 15px; position: relative; }
-        .rpg-title { position: absolute; top: -10px; left: 10px; background: #000; padding: 0 5px; font-weight: bold; font-size: 0.8rem; }
-        
-        /* Status Bar */
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; text-align: center; font-size: 0.8rem; margin-bottom: 10px; }
-        .stat-val { font-size: 1.2rem; font-weight: bold; }
+        /* REPORT MODAL (Simple overlay) */
+        #report-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 50; display: none;
+            align-items: center; justify-content: center;
+        }
+        .modal-box { width: 80%; border: 2px solid #fff; padding: 20px; background: #000; }
 
-        /* Party Slots */
-        .party-slot { border: 1px dashed #444; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
-        .slot-empty { color: #444; }
-        .slot-filled { color: #fff; }
+        /* TACTICAL COMMS */
+        .sig-row { display: flex; gap: 5px; margin-top: 10px; }
+        .sig-btn { flex: 1; border: 1px solid #444; background: #000; color: #888; padding: 5px; font-size: 0.7rem; cursor: pointer; }
+        .sig-btn:hover { border-color: #fff; color: #fff; }
 
-        /* Progress Bar */
-        .progress-frame { width: 100%; border: 1px solid #444; height: 10px; margin: 10px 0; }
-        .progress-fill { height: 100%; background: #fff; width: 0%; transition: width 0.3s; }
-
-        /* Quest List Item */
-        .quest-item { padding: 10px; border-bottom: 1px solid #222; cursor: pointer; }
-        .quest-item:hover { background: #111; }
-        .quest-req { font-size: 0.7rem; color: #888; margin-top: 5px; }
-
-        input, select { width: 100%; background: #000; color: #fff; border: var(--border); padding: 10px; margin-bottom: 10px; font-family: inherit; box-sizing: border-box; outline: none; }
-        .btn-action { width: 100%; padding: 12px; background: #000; color: #fff; border: var(--active); font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .btn-action:hover { background: #fff; color: #000; }
-        .console { margin-top: 20px; border-top: var(--border); padding: 10px; height: 100px; overflow-y: auto; font-size: 0.7rem; color: var(--dim); }
-    </style>
-
+    </script>
     <script>
         // Bridge
         let sk=null, pk=null; const relays=['wss://relay.damus.io'];
         function js_set_key(hex){ try{sk=hex; pk=window.NostrTools.getPublicKey(sk); return pk;}catch{return null;} }
         async function js_pub(k,c,t){ if(!sk)return; const e={kind:k,pubkey:pk,created_at:Math.floor(Date.now()/1000),tags:t,content:c}; e.id=window.NostrTools.getEventHash(e); e.sig=window.NostrTools.signEvent(e,sk); (new window.NostrTools.SimplePool()).publish(relays,e); return e.id; }
-        function switchMod(id){ document.querySelectorAll('.module').forEach(e=>e.classList.remove('active')); document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active')); document.getElementById('m-'+id).classList.add('active'); document.getElementById('btn-'+id).classList.add('active'); }
-        function forceStart(){ document.getElementById('screen-loader').style.display='none'; document.getElementById('screen-void').style.display='flex'; }
+        function switchTab(id){ document.querySelectorAll('.module').forEach(e=>e.classList.add('hidden')); document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active')); document.getElementById('mod-'+id).classList.remove('hidden'); document.getElementById('tab-'+id).classList.add('active'); }
+        function forceStart(){ document.getElementById('screen-loader').style.display='none'; }
     </script>
 </head>
 <body>
 
     <!-- 0. LOADER -->
-    <div id="screen-loader" onclick="forceStart()"><div style="font-size:0.8rem;">BOOTING PITHOS...</div><div class="loading-bar"></div></div>
-    <!-- 1. VOID -->
-    <div id="screen-void" onclick="toAuth()" style="display:none;"><span class="blink">&gt; CONNECT</span></div>
-    <!-- 2. AUTH -->
-    <div id="screen-auth">
-        <input type="text" id="in-name" class="auth-input" placeholder="NAME" autocomplete="off">
-        <input type="text" id="in-word" class="auth-input" placeholder="WORD" autocomplete="off">
-        <div style="font-size:0.7rem; color:#666;">SIGIL REQUIRED</div>
-        <div id="pattern-container"><canvas id="lock-canvas" width="300" height="300"></canvas></div>
+    <div id="screen-loader" onclick="forceStart()"><div>SYSTEM LOADING...</div><div class="loading-bar"><div></div></div></div>
+    <!-- 1. AUTH -->
+    <div id="screen-auth" class="hidden">
+        <div class="window" style="width:280px;">
+            <div class="win-title">LOGIN</div>
+            <input type="text" id="in-name" class="auth-input" placeholder="NAME">
+            <input type="text" id="in-word" class="auth-input" placeholder="WORD">
+            <div id="pattern-container"><canvas id="lock-canvas" width="260" height="260"></canvas></div>
+        </div>
     </div>
 
-    <!-- 3. MAIN OS -->
-    <div id="screen-main">
-        <div class="sidebar">
-            <div id="btn-audit" class="nav-btn active" onclick="switchMod('audit')"><i class="fas fa-eye"></i></div>
-            <div id="btn-yorbee" class="nav-btn" onclick="switchMod('yorbee')"><i class="fas fa-dungeon"></i></div>
-            <div id="btn-gcart" class="nav-btn" onclick="switchMod('gcart')"><i class="fas fa-building"></i></div>
+    <!-- 3. MAIN -->
+    <div id="screen-main" class="hidden">
+        <div class="top-bar">
+            <div><span id="disp-name">GUEST</span> <span style="font-size:0.8rem; color:#666;">LV.1</span></div>
+            <div id="disp-job">...</div>
         </div>
 
-        <div class="content">
-            <div class="header">
-                <div>PITHOS OS <span style="font-size:0.7rem; border:1px solid #fff; padding:0 3px;">v2.3</span></div>
-                <div class="user-id" id="disp-uid">OFFLINE</div>
-            </div>
-
-            <!-- AUDITOR -->
-            <div id="m-audit" class="module active">
-                <div class="rpg-box">
-                    <div class="rpg-title">SCANNER</div>
-                    <label>TARGET</label><input type="text" id="a-target" placeholder="NAME">
-                    <label>COST</label><input type="number" id="a-budget" placeholder="JPY">
-                    <label>USER</label><input type="number" id="a-users" placeholder="PPL">
-                    <button class="btn-action" py-click="audit">SCAN</button>
+        <div class="workspace">
+            
+            <!-- HOME -->
+            <div id="mod-home" class="module">
+                <div class="window">
+                    <div class="win-title">STATUS</div>
+                    <div class="stat-row"><span>STR</span><span id="st-str">?</span></div>
+                    <div class="stat-row"><span>INT</span><span id="st-int">?</span></div>
+                    <div class="stat-row"><span>DEX</span><span id="st-dex">?</span></div>
                 </div>
-                <div id="a-res" style="font-size:1.5rem; text-align:center;">---</div>
             </div>
 
-            <!-- YORBEE (RPG MODE) -->
-            <div id="m-yorbee" class="module">
+            <!-- QUEST / DUNGEON -->
+            <div id="mod-quest" class="module hidden">
                 
-                <!-- 1. STATUS WINDOW -->
-                <div class="rpg-box">
-                    <div class="rpg-title">ADVENTURER STATUS</div>
-                    <div class="stat-grid">
-                        <div>STR<br><span id="st-str" class="stat-val">?</span></div>
-                        <div>INT<br><span id="st-int" class="stat-val">?</span></div>
-                        <div>DEX<br><span id="st-dex" class="stat-val">?</span></div>
+                <!-- LIST VIEW -->
+                <div id="view-qlist">
+                    <div class="window">
+                        <div class="win-title">QUEST BOARD</div>
+                        <div id="quest-list"><!-- Injected --></div>
                     </div>
+                    <button class="btn" py-click="add_demo_quest">＋ REFRESH QUESTS</button>
                 </div>
 
-                <!-- 2. QUEST BOARD -->
-                <div id="view-board">
-                    <div class="rpg-box">
-                        <div class="rpg-title">QUEST BOARD</div>
-                        <div id="quest-list">
-                            <!-- Injected by Python -->
-                        </div>
-                    </div>
-                    <button class="btn-action" style="font-size:0.8rem; border-style:dashed;" py-click="toggle_post">＋ POST NEW QUEST</button>
-                    <div id="post-area" style="display:none; margin-top:10px;">
-                        <input type="text" id="y-title" placeholder="TITLE">
-                        <input type="text" id="y-req" placeholder="REQ (e.g. STR>5)">
-                        <button class="btn-action" py-click="post_job">PUBLISH</button>
-                    </div>
-                </div>
-
-                <!-- 3. DUNGEON VIEW (Hidden by default) -->
+                <!-- DUNGEON VIEW (Progress Management) -->
                 <div id="view-dungeon" class="hidden">
-                    <div class="rpg-box">
-                        <div class="rpg-title">CURRENT QUEST</div>
-                        <div id="dun-title" style="font-size:1.2rem; font-weight:bold; margin-bottom:5px;">Loading...</div>
-                        <div class="progress-frame"><div id="dun-bar" class="progress-fill"></div></div>
+                    <div class="window" style="border-color:#fff;">
+                        <div class="win-title">CURRENT MISSION</div>
+                        <h2 id="dun-title" style="margin:5px 0;">...</h2>
                         
-                        <div style="margin-top:15px;">
-                            <div class="party-slot slot-filled">
-                                <span><i class="fas fa-user"></i> YOU (LEADER)</span>
-                                <span>LV.10</span>
-                            </div>
-                            <div class="party-slot slot-empty">
-                                <span><i class="far fa-user"></i> EMPTY SLOT</span>
-                                <span>[INVITE]</span>
+                        <!-- HP Bar (Progress) -->
+                        <div class="hp-bar-frame">
+                            <div id="dun-hp" class="hp-bar-fill"></div>
+                            <div class="hp-text">PROGRESS <span id="dun-pct">0</span>%</div>
+                        </div>
+
+                        <!-- Tasks (Enemies) -->
+                        <div style="margin: 15px 0;">
+                            <div class="win-title" style="position:static; background:none; margin-bottom:5px;">ENEMIES (TASKS)</div>
+                            <div id="task-list">
+                                <!-- Python Injects Tasks Here -->
                             </div>
                         </div>
 
-                        <div style="margin-top:20px;">
-                            <div class="rpg-title" style="position:relative; top:0; margin-bottom:5px;">TASKS</div>
-                            <div style="font-size:0.9rem;">
-                                <div style="margin-bottom:5px;"><input type="checkbox" py-click="update_prog"> Site Survey</div>
-                                <div style="margin-bottom:5px;"><input type="checkbox" py-click="update_prog"> Repair Work</div>
-                                <div style="margin-bottom:5px;"><input type="checkbox" py-click="update_prog"> Final Report</div>
-                            </div>
+                        <!-- Battle Log -->
+                        <div class="battle-log" id="battle-log">
+                            <div class="log-line">> ENTERED DUNGEON.</div>
+                        </div>
+
+                        <!-- Tactical Comms -->
+                        <div class="sig-row">
+                            <button class="sig-btn" py-click="lambda e: send_sig('📍ARRIVED')">📍 ARRIVED</button>
+                            <button class="sig-btn" py-click="lambda e: send_sig('🔨 WORKING')">🔨 WORKING</button>
+                            <button class="sig-btn" py-click="lambda e: send_sig('🆘 SOS')">🆘 SOS</button>
+                        </div>
+
+                        <div style="display:flex; gap:10px; margin-top:15px;">
+                            <button class="btn" py-click="exit_dungeon" style="border-color:#666; color:#666;">RETREAT</button>
+                            <button class="btn" id="btn-claim" style="display:none;" py-click="claim_reward">💰 CLAIM REWARD</button>
                         </div>
                     </div>
-                    
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        <button class="btn-action" py-click="leave_dungeon">ABORT</button>
-                        <button class="btn-action" style="background:#fff; color:#000;">COMPLETE</button>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- G-CART -->
-            <div id="m-gcart" class="module">
-                <div class="rpg-box">
-                    <div class="rpg-title">COMPANY</div>
-                    <div>CAPACITY: ¥30,000,000</div>
-                </div>
-                <div class="rpg-box">
-                    <div class="rpg-title">MARKET</div>
-                    <select id="g-sel"><option>SCHOOL RENOVATION (¥50M)</option></select>
-                    <button class="btn-action" py-click="bid">BID</button>
                 </div>
             </div>
 
-            <div class="console" id="sys-log"><div>SYSTEM STANDBY</div></div>
+            <!-- AUDIT -->
+            <div id="mod-audit" class="module hidden">
+                <div class="window">
+                    <div class="win-title">SCANNER</div>
+                    <label>TARGET</label><input id="a-t"><label>COST</label><input id="a-b"><label>USER</label><input id="a-u">
+                    <button class="btn" py-click="audit">SCAN</button>
+                </div>
+                <div id="a-res" style="text-align:center; font-size:1.5rem;">---</div>
+            </div>
+
+        </div>
+
+        <div class="bottom-nav">
+            <div id="tab-home" class="nav-item active" onclick="switchTab('home')"><i class="fas fa-user"></i></div>
+            <div id="tab-quest" class="nav-item" onclick="switchTab('quest')"><i class="fas fa-dungeon"></i></div>
+            <div id="tab-audit" class="nav-item" onclick="switchTab('audit')"><i class="fas fa-eye"></i></div>
+        </div>
+    </div>
+
+    <!-- REPORT OVERLAY -->
+    <div id="report-overlay">
+        <div class="modal-box">
+            <div class="win-title">BATTLE REPORT</div>
+            <p id="rep-task-name">TASK NAME</p>
+            <input type="text" id="rep-msg" placeholder="REPORT / PROOF URL">
+            <div style="display:flex; gap:10px;">
+                <button class="btn" onclick="document.getElementById('report-overlay').style.display='none'">CANCEL</button>
+                <button class="btn" py-click="submit_report">ATTACK (SUBMIT)</button>
+            </div>
         </div>
     </div>
 
     <!-- JS: SIGIL -->
     <script>
         let pPath=[], isD=false; const cvs=document.getElementById('lock-canvas'), ctx=cvs.getContext('2d');
-        const dots=[]; for(let r=0;r<3;r++)for(let c=0;c<3;c++) dots.push({x:50+c*100,y:50+r*100,id:r*3+c});
-        function dr(){ ctx.clearRect(0,0,300,300); if(pPath.length>1){ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.moveTo(dots[pPath[0]].x, dots[pPath[0]].y); for(let i=1;i<pPath.length;i++) ctx.lineTo(dots[pPath[i]].x, dots[pPath[i]].y); ctx.stroke();} dots.forEach(d=>{ ctx.beginPath(); ctx.fillStyle=pPath.includes(d.id)?'#fff':'#333'; ctx.arc(d.x,d.y, pPath.includes(d.id)?6:3, 0,Math.PI*2); ctx.fill(); }); }
+        const dots=[]; for(let r=0;r<3;r++)for(let c=0;c<3;c++) dots.push({x:30+c*100,y:30+r*100,id:r*3+c});
+        function dr(){ ctx.clearRect(0,0,260,260); if(pPath.length>1){ctx.beginPath(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.moveTo(dots[pPath[0]].x, dots[pPath[0]].y); for(let i=1;i<pPath.length;i++) ctx.lineTo(dots[pPath[i]].x, dots[pPath[i]].y); ctx.stroke();} dots.forEach(d=>{ ctx.beginPath(); ctx.fillStyle=pPath.includes(d.id)?'#fff':'#333'; ctx.arc(d.x,d.y, pPath.includes(d.id)?6:3, 0,Math.PI*2); ctx.fill(); }); }
         const mv=e=>{if(isD){e.preventDefault();const r=cvs.getBoundingClientRect();const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;const d=dots.find(dt=>Math.hypot(dt.x-x,dt.y-y)<30);if(d&&!pPath.includes(d.id)){pPath.push(d.id);dr();}}};
         const end=e=>{isD=false; if(pPath.length>=4)window.onSigil(document.getElementById('in-name').value,document.getElementById('in-word').value,pPath.join("-")); else{pPath=[];dr();}};
         cvs.addEventListener('mousedown',e=>{isD=true;pPath=[];mv(e)}); cvs.addEventListener('touchstart',e=>{isD=true;pPath=[];mv(e)});
         cvs.addEventListener('mousemove',mv); cvs.addEventListener('touchmove',mv); cvs.addEventListener('mouseup',end); cvs.addEventListener('touchend',end); dr();
-        function toAuth(){ document.getElementById('screen-void').style.display='none'; document.getElementById('screen-auth').style.display='flex'; }
+        function toAuth(){ document.getElementById('screen-loader').style.display='none'; document.getElementById('screen-auth').classList.remove('hidden'); document.getElementById('screen-auth').style.display='flex'; }
     </script>
 
     <!-- PYTHON LOGIC -->
     <script type="py">
         from pyscript import document
         from pyodide.ffi import create_proxy
-        import js, hashlib, random
+        import js, hashlib
         from datetime import datetime
 
-        # --- GLOBAL ---
+        # STATE
+        active_quest = None
+        # Tasks: {id, name, done}
+        current_tasks = []
+        target_task_id = -1
+
         quests = [
-            {"id":1, "title": "REPAIR OLD BRIDGE", "req": "STR > 5", "reward": 50000},
-            {"id":2, "title": "ANALYZE TRAFFIC", "req": "INT > 7", "reward": 30000},
+            {"title": "Bridge Repair", "reward": 50000},
+            {"title": "Data Analysis", "reward": 20000},
         ]
 
-        def boot():
-            document.getElementById('screen-loader').style.display = 'none'
-            document.getElementById('screen-void').style.display = 'flex'
-            render_board()
-
-        def log(m):
+        def log(msg):
             t = datetime.now().strftime('%H:%M')
-            c = document.getElementById("sys-log")
-            c.innerHTML = f"<div>[{t}] {m}</div>" + c.innerHTML
+            c = document.getElementById("battle-log")
+            c.innerHTML = f"<div class='log-line'>[{t}] {msg}</div>" + c.innerHTML
 
-        # --- AUTH & RPG STATS ---
+        # AUTH
         def on_sigil_py(name, word, pattern):
             if not name: return
             seed = f"SBCM_{name}_{word}_{pattern}"
             pk_hex = hashlib.sha256(seed.encode()).hexdigest()
             pub = js.js_set_key(pk_hex)
-            
             if pub:
-                document.getElementById('screen-auth').style.display = 'none'
+                document.getElementById('screen-auth').classList.add('hidden')
                 document.getElementById('screen-main').style.display = 'flex'
-                document.getElementById('disp-uid').innerText = name.upper()
                 
-                # GENERATE RPG STATS (Deterministic)
+                # Stats
                 val = int(pk_hex[:8], 16)
-                s_str = (val % 10) + 1
-                s_int = ((val >> 4) % 10) + 1
-                s_dex = ((val >> 8) % 10) + 1
+                document.getElementById('disp-name').innerText = name.upper()
+                document.getElementById('disp-job').innerText = "WIZARD" if val%2==0 else "WARRIOR"
+                document.getElementById('st-str').innerText = (val%10)+1
+                document.getElementById('st-int').innerText = ((val>>4)%10)+1
+                document.getElementById('st-dex').innerText = ((val>>8)%10)+1
                 
-                document.getElementById('st-str').innerText = s_str
-                document.getElementById('st-int').innerText = s_int
-                document.getElementById('st-dex').innerText = s_dex
-                
-                log(f"LOGIN: {name}")
-                log(f"STATS GENERATED: STR={s_str} INT={s_int}")
+                render_quests()
 
         js.window.onSigil = create_proxy(on_sigil_py)
 
-        # --- YORBEE LOGIC ---
-        def render_board():
-            ul = document.getElementById("quest-list")
-            ul.innerHTML = ""
+        # QUEST LIST
+        def render_quests():
+            c = document.getElementById("quest-list")
+            c.innerHTML = ""
             for q in quests:
                 div = document.createElement("div")
-                div.className = "quest-item"
-                # Add click event to start quest
-                div.onclick = lambda e, qt=q['title']: start_quest(qt)
-                div.innerHTML = f"<div>{q['title']} <span style='float:right'>¥{q['reward']:,}</span></div><div class='quest-req'>REQ: {q['req']}</div>"
-                ul.appendChild(div)
+                div.className = "quest-card"
+                div.innerHTML = f"{q['title']} <span class='quest-reward'>¥{q['reward']:,}</span>"
+                div.onclick = lambda e, t=q['title']: init_dungeon(t)
+                c.appendChild(div)
 
-        def toggle_post(e):
-            el = document.getElementById("post-area")
-            el.style.display = "block" if el.style.display == "none" else "none"
+        def add_demo_quest(e):
+            quests.insert(0, {"title": "New Mission", "reward": 10000})
+            render_quests()
 
-        async def post_job(e):
-            t = document.getElementById("y-title").value
-            r = document.getElementById("y-req").value
-            quests.insert(0, {"id":99, "title":t, "req":r, "reward":0})
-            render_board()
-            document.getElementById("post-area").style.display = "none"
-            await js.js_pub(1, f"QUEST:{t}", [["t","SBCM_JOB"]])
+        # DUNGEON LOGIC
+        def init_dungeon(title):
+            global active_quest, current_tasks
+            active_quest = title
+            # Generate Tasks (Enemies)
+            current_tasks = [
+                {"id":0, "name": "SURVEY AREA (調査)", "done": False},
+                {"id":1, "name": "EXECUTION (実作業)", "done": False},
+                {"id":2, "name": "REPORTING (報告)", "done": False}
+            ]
+            
+            document.getElementById('view-qlist').classList.add('hidden')
+            document.getElementById('view-dungeon').classList.remove('hidden')
+            document.getElementById('dun-title').innerText = title
+            render_tasks()
+            log(f"MISSION START: {title}")
 
-        def start_quest(title):
-            # Switch to Dungeon View
-            document.getElementById("view-board").classList.add("hidden")
-            document.getElementById("view-dungeon").classList.remove("hidden")
-            document.getElementById("dun-title").innerText = title
-            log(f"QUEST STARTED: {title}")
+        def render_tasks():
+            c = document.getElementById("task-list")
+            c.innerHTML = ""
+            done_cnt = 0
+            for t in current_tasks:
+                div = document.createElement("div")
+                status = ""
+                if t["done"]:
+                    div.className = "enemy-row defeated"
+                    status = "[DEFEATED]"
+                    done_cnt += 1
+                else:
+                    div.className = "enemy-row"
+                    status = "[ALIVE]"
+                    # Click to attack
+                    div.onclick = lambda e, tid=t["id"], nm=t["name"]: open_report(tid, nm)
+                
+                div.innerHTML = f"<span>{t['name']}</span><span>{status}</span>"
+                c.appendChild(div)
+            
+            # Update Progress Bar
+            pct = int((done_cnt / len(current_tasks)) * 100)
+            document.getElementById("dun-hp").style.width = f"{pct}%"
+            document.getElementById("dun-pct").innerText = pct
+            
+            if pct >= 100:
+                document.getElementById("btn-claim").style.display = "block"
+                log("BOSS DEFEATED. CLAIM REWARD.")
 
-        def leave_dungeon(e):
-            document.getElementById("view-dungeon").classList.add("hidden")
-            document.getElementById("view-board").classList.remove("hidden")
-            log("QUEST ABORTED")
+        def open_report(tid, name):
+            global target_task_id
+            target_task_id = tid
+            document.getElementById('rep-task-name').innerText = f"TARGET: {name}"
+            document.getElementById('rep-msg').value = ""
+            document.getElementById('report-overlay').style.display = 'flex'
 
-        def update_prog(e):
-            # Simple progress calc
-            boxes = document.querySelectorAll("#view-dungeon input[type='checkbox']")
-            total = len(boxes)
-            checked = len([b for b in boxes if b.checked])
-            pct = (checked / total) * 100
-            document.getElementById("dun-bar").style.width = f"{pct}%"
-            if pct >= 100: log("ALL TASKS COMPLETE. READY TO SUBMIT.")
+        async def submit_report(e):
+            global current_tasks
+            msg = document.getElementById('rep-msg').value
+            if not msg: msg = "No details"
+            
+            # Mark as done
+            current_tasks[target_task_id]["done"] = True
+            document.getElementById('report-overlay').style.display = 'none'
+            
+            render_tasks()
+            log(f"HIT! {current_tasks[target_task_id]['name']} -> {msg}")
+            
+            # Send to Nostr
+            await js.js_pub(1, f"PROGRESS: {active_quest}\nTASK:{target_task_id} DONE\nNOTE:{msg}", [["t","SBCM_PROG"]])
 
-        # --- OTHER ---
+        def exit_dungeon(e):
+            document.getElementById('view-dungeon').classList.add('hidden')
+            document.getElementById('view-qlist').classList.remove('hidden')
+
+        async def claim_reward(e):
+            await js.js_pub(1, f"CLAIM: {active_quest} COMPLETE", [["t","SBCM_CLAIM"]])
+            log("REWARD CLAIMED. TX SENT.")
+            js.alert("QUEST COMPLETE!\nReward sent to The Heart.")
+            exit_dungeon(None)
+
+        # COMMS
+        async def send_sig(sig):
+            log(f"SIGNAL: {sig}")
+            await js.js_pub(1, f"SIG: {sig}", [["t","SBCM_SIG"]])
+
+        # AUDIT
         async def audit(e):
             try:
-                b = float(document.getElementById("a-budget").value)
-                u = float(document.getElementById("a-users").value)
+                b=float(document.getElementById("a-b").value)
+                u=float(document.getElementById("a-u").value)
                 d = b/30000000/(u/72000) if u else 0
                 document.getElementById("a-res").innerText = f"D: {d:.1f}"
                 await js.js_pub(1, f"AUDIT D:{d}", [["t","SBCM"]])
             except: pass
 
-        async def bid(e):
-            await js.js_pub(1, "BID", [["t","SBCM_BID"]])
-            log("BID SENT")
-
-        boot()
+        toAuth() # Start
     </script>
-</body>
+  </body>
 </html>
