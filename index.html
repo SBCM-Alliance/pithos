@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pithos | Guild Master</title>
+    
+    <!-- Libraries -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- MONOCHROME RPG THEME --- */
+        :root { --bg: #000; --fg: #fff; --dim: #666; --border: 1px solid #fff; --active: 2px solid #fff; }
+        body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'JetBrains Mono', monospace; height: 100dvh; overflow: hidden; user-select: none; }
+        
+        .hidden { display: none !important; }
+        
+        /* AUTH & LOAD (Standard) */
+        #screen-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: absolute; width: 100%; background: #000; z-index: 99; }
+        .loading-bar { width: 100px; height: 2px; background: #333; margin-top: 10px; } .loading-bar div { height: 100%; width: 50%; background: #fff; animation: load 1s infinite; } @keyframes load { 0% { margin-left: -50%; } 100% { margin-left: 100%; } }
+        
+        /* CHARACTER CREATION SCREEN */
+        #screen-auth { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; overflow-y: auto; padding: 20px;}
+        .auth-input { background: transparent; border: none; border-bottom: 1px solid var(--dim); color: var(--fg); font-size: 1.2rem; padding: 10px; width: 280px; margin-bottom: 15px; text-align: center; outline: none; }
+        
+        /* SLIDER STYLE */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; margin-bottom: 20px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 15px; width: 15px; background: #fff; cursor: pointer; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 2px; cursor: pointer; background: #333; }
+
+        /* MAIN UI */
+        #screen-main { display: none; height: 100%; display: flex; flex-direction: column; }
+        .top-bar { display: flex; justify-content: space-between; padding: 10px 15px; border-bottom: 1px solid #333; }
+        .workspace { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+        .bottom-nav { display: flex; border-top: 1px solid #333; }
+        .nav-item { flex: 1; text-align: center; padding: 15px 0; cursor: pointer; border-right: 1px solid #333; }
+        .nav-item.active { background: #fff; color: #000; }
+
+        /* RPG ELEMENTS */
+        .rpg-box { border: 1px solid #fff; padding: 15px; margin-bottom: 20px; position: relative; }
+        .rpg-title { position: absolute; top: -10px; left: 10px; background: #000; padding: 0 5px; font-weight: bold; font-size: 0.8rem; }
+        
+        /* STATUS GRID */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; margin-bottom: 10px; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; display: block; }
+        .stat-label { font-size: 0.7rem; color: #888; }
+
+        /* QUEST BOARD */
+        .quest-card { border: 1px solid #444; padding: 10px; margin-bottom: 8px; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .quest-card:hover { border-color: #fff; }
+        
+        /* TAVERN (PARTY MATCHING) */
+        .rec-card { border: 1px dashed #666; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .rec-match { color: gold; font-size: 0.7rem; }
+
+        /* DUNGEON (Progress) */
+        .hp-bar-frame { width: 100%; border: 1px solid #444; height: 15px; margin: 10px 0; position: relative; }
+        .hp-bar-fill { height: 100%; background: #fff; width: 0%; transition: width 0.3s; }
+        
+        /* BUTTONS */
+        .btn { border: 1px solid #fff; background: #000; color: #fff; padding: 10px; cursor: pointer; font-weight: bold; text-align: center; width: 100%; margin-top: 5px; }
+        .btn:hover { background: #fff; color: #000; }
+        .btn:disabled { border-color: #333; color: #333; cursor: not-allowed; background: #000; }
+
+        .log-area { font-size: 0.7rem; color: #888; margin-top: 5px; height: 60px; overflow-y: auto; border-top: 1px dashed #333; padding-top: 5px;}
+    </style>
+
+    <script>
+        // Bridge
+        let sk=null, pk=null; const relays=['wss://relay.damus.io'];
+        function js_set_key(hex){ try{sk=hex; pk=window.NostrTools.getPublicKey(sk); return pk;}catch{return null;} }
+        async function js_pub(k,c,t){ if(!sk)return; const e={kind:k,pubkey:pk,created_at:Math.floor(Date.now()/1000),tags:t,content:c}; e.id=window.NostrTools.getEventHash(e); e.sig=window.NostrTools.signEvent(e,sk); (new window.NostrTools.SimplePool()).publish(relays,e); return e.id; }
+        function switchTab(id){ document.querySelectorAll('.module').forEach(e=>e.classList.add('hidden')); document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active')); document.getElementById('mod-'+id).classList.remove('hidden'); document.getElementById('tab-'+id).classList.add('active'); }
+        function forceStart(){ document.getElementById('screen-loader').style.display='none'; document.getElementById('screen-auth').style.display='flex'; }
+    </script>
+</head>
+<body>
+
+    <!-- 0. LOADER -->
+    <div id="screen-loader" onclick="forceStart()"><div>BOOTING...</div><div class="loading-bar"><div></div></div></div>
+    
+    <!-- 1. AUTH & CHAR MAKE (冒険の書) -->
+    <div id="screen-auth" class="hidden">
+        <div class="rpg-box" style="width:280px; text-align:center;">
+            <div class="rpg-title">冒険の書 (PROFILE)</div>
+            <p style="font-size:0.8rem; color:#888;">名前と能力値を申告せよ</p>
+            
+            <input type="text" id="in-name" class="auth-input" placeholder="NAME (名前)">
+            <input type="text" id="in-word" class="auth-input" placeholder="WORD (信念/パス)">
+            
+            <div style="text-align:left; margin-top:20px;">
+                <label>💪 STR (体力): <span id="val-str">5</span></label>
+                <input type="range" id="sl-str" min="1" max="10" value="5" oninput="document.getElementById('val-str').innerText=this.value">
+                
+                <label>🧠 INT (知力): <span id="val-int">5</span></label>
+                <input type="range" id="sl-int" min="1" max="10" value="5" oninput="document.getElementById('val-int').innerText=this.value">
+                
+                <label>💖 CHA (魅力): <span id="val-cha">5</span></label>
+                <input type="range" id="sl-cha" min="1" max="10" value="5" oninput="document.getElementById('val-cha').innerText=this.value">
+            </div>
+
+            <button class="btn" py-click="login">冒険を始める</button>
+        </div>
+    </div>
+
+    <!-- 3. MAIN OS -->
+    <div id="screen-main" class="hidden">
+        <div class="top-bar">
+            <div><span id="disp-name">GUEST</span> <span style="font-size:0.8rem; color:#666;" id="disp-job">LV.1</span></div>
+            <div>¥<span id="disp-money">0</span></div>
+        </div>
+
+        <div class="workspace">
+            
+            <!-- HOME / STATUS -->
+            <div id="mod-home" class="module">
+                <div class="rpg-box">
+                    <div class="rpg-title">ADVENTURER STATUS</div>
+                    <div style="text-align:center; margin-bottom:10px;">
+                        <i class="fas fa-user-circle" style="font-size:3rem;"></i>
+                    </div>
+                    <div class="stat-grid">
+                        <div><span class="stat-label">STR</span><span id="st-str" class="stat-val">?</span></div>
+                        <div><span class="stat-label">INT</span><span id="st-int" class="stat-val">?</span></div>
+                        <div><span class="stat-label">CHA</span><span id="st-cha" class="stat-val">?</span></div>
+                    </div>
+                </div>
+                
+                <div class="rpg-box">
+                    <div class="rpg-title">LOG</div>
+                    <div id="sys-log" class="log-area">> System Ready.</div>
+                </div>
+            </div>
+
+            <!-- YORBEE (QUEST) -->
+            <div id="mod-quest" class="module hidden">
+                
+                <!-- PHASE 1: LIST VIEW -->
+                <div id="view-qlist">
+                    <div class="rpg-box">
+                        <div class="rpg-title">QUEST BOARD (求人)</div>
+                        <div id="quest-container"></div>
+                    </div>
+                    <button class="btn" py-click="add_demo_quest" style="border-style:dashed;">＋ クエスト張り出し (発注)</button>
+                </div>
+
+                <!-- PHASE 2: TAVERN (PARTY MATCHING) -->
+                <div id="view-tavern" class="hidden">
+                    <div class="rpg-box">
+                        <div class="rpg-title">TAVERN (酒場)</div>
+                        <h3 id="tav-title" style="margin:5px 0;">...</h3>
+                        <p style="font-size:0.8rem; color:#888;">このクエストには <b>INT > 7</b> が必要です。</p>
+                        
+                        <div style="margin:20px 0;">
+                            <div style="font-size:0.8rem; margin-bottom:5px;">▼ AIレコメンド (仲間候補)</div>
+                            <div id="rec-list">
+                                <!-- Python Injects -->
+                            </div>
+                        </div>
+
+                        <div id="party-status" style="text-align:center; margin-bottom:10px; font-weight:bold; color:#666;">
+                            攻略成功率: <span id="win-rate">20</span>%
+                        </div>
+                        <div class="hp-bar-frame" style="height:5px;"><div id="win-bar" class="hp-bar-fill" style="width:20%"></div></div>
+
+                        <button class="btn" id="btn-depart" disabled py-click="start_dungeon">このメンバーで出発</button>
+                        <button class="btn" style="border:none; color:#888;" onclick="document.getElementById('view-tavern').classList.add('hidden');document.getElementById('view-qlist').classList.remove('hidden')">戻る</button>
+                    </div>
+                </div>
+
+                <!-- PHASE 3: DUNGEON (PROGRESS) -->
+                <div id="view-dungeon" class="hidden">
+                    <div class="rpg-box">
+                        <div class="rpg-title">DUNGEON (進行中)</div>
+                        <h2 id="dun-name" style="margin:5px 0;">...</h2>
+                        <div class="hp-bar-frame"><div id="dun-hp" class="hp-bar-fill"></div></div>
+                        <div style="font-size:0.8rem; color:#888;">攻略進捗: <span id="dun-pct">0</span>%</div>
+                        
+                        <div style="margin-top:20px;">
+                            <div style="margin-bottom:10px;"><input type="checkbox" py-click="upd_prog"> 現場調査・準備</div>
+                            <div style="margin-bottom:10px;"><input type="checkbox" py-click="upd_prog"> 本作業 (Execution)</div>
+                            <div style="margin-bottom:10px;"><input type="checkbox" py-click="upd_prog"> 完了報告書作成</div>
+                        </div>
+                        
+                        <button class="btn" id="btn-claim" style="display:none; background:#fff; color:#000;" py-click="claim_reward">💰 報酬を受け取って解散</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- G-CART (AUDIT/BID) -->
+            <div id="mod-gcart" class="module hidden">
+                <div class="rpg-box">
+                    <div class="rpg-title">G-CART (公共調達)</div>
+                    <label>TARGET</label><input type="text" id="a-t" placeholder="例: 新庁舎建設" style="width:100%; background:#000; color:#fff; border:1px solid #666; padding:8px; margin-bottom:10px;">
+                    <label>BUDGET</label><input type="number" id="a-b" placeholder="100000000" style="width:100%; background:#000; color:#fff; border:1px solid #666; padding:8px; margin-bottom:10px;">
+                    <label>USERS</label><input type="number" id="a-u" placeholder="100" style="width:100%; background:#000; color:#fff; border:1px solid #666; padding:8px; margin-bottom:10px;">
+                    <button class="btn" py-click="audit">SBCM AUDIT (歪み判定)</button>
+                </div>
+                <div id="a-res" style="text-align:center; font-size:1.5rem; margin-top:10px;">---</div>
+            </div>
+
+        </div>
+
+        <div class="bottom-nav">
+            <div id="tab-home" class="nav-item active" onclick="switchTab('home')"><i class="fas fa-user"></i> PROFILE</div>
+            <div id="tab-quest" class="nav-item" onclick="switchTab('quest')"><i class="fas fa-dungeon"></i> YORBEE</div>
+            <div id="tab-gcart" class="nav-item" onclick="switchTab('gcart')"><i class="fas fa-building"></i> G-CART</div>
+        </div>
+    </div>
+
+    <!-- PYTHON LOGIC -->
+    <script type="py">
+        from pyscript import document
+        from pyodide.ffi import create_proxy
+        import js, hashlib
+        from datetime import datetime
+
+        # STATE
+        quests = [
+            {"title": "魔王城(役所)の決算報告", "reward": 25000, "req_int": 7},
+            {"title": "街道(通学路)の舗装補修", "reward": 50000, "req_int": 2},
+        ]
+        partners = [
+            {"name": "魔法使い(経理)", "int": 8, "fee": 2000},
+            {"name": "戦士(土木)", "int": 2, "fee": 5000},
+            {"name": "僧侶(メンター)", "int": 6, "fee": 3000},
+        ]
+        
+        my_stats = {"str":5, "int":5, "cha":5}
+        party_score = 0
+
+        def log(m):
+            t = datetime.now().strftime('%H:%M')
+            c = document.getElementById("sys-log")
+            c.innerHTML = f"<div>[{t}] {m}</div>" + c.innerHTML
+
+        # --- LOGIN & CHAR MAKE ---
+        def login(e):
+            name = document.getElementById("in-name").value
+            word = document.getElementById("in-word").value
+            
+            if not name: return
+            
+            # Save Self-Declared Stats
+            my_stats["str"] = int(document.getElementById("sl-str").value)
+            my_stats["int"] = int(document.getElementById("sl-int").value)
+            my_stats["cha"] = int(document.getElementById("sl-cha").value)
+            
+            # Key Gen (Brain Key)
+            seed = f"SBCM_{name}_{word}"
+            pk_hex = hashlib.sha256(seed.encode()).hexdigest()
+            pub = js.js_set_key(pk_hex)
+            
+            if pub:
+                document.getElementById('screen-auth').classList.add('hidden')
+                document.getElementById('screen-main').style.display = 'flex'
+                
+                document.getElementById('disp-name').innerText = name.upper()
+                document.getElementById('st-str').innerText = my_stats["str"]
+                document.getElementById('st-int').innerText = my_stats["int"]
+                document.getElementById('st-cha').innerText = my_stats["cha"]
+                
+                render_quests()
+                log(f"Login: {name}")
+
+        # --- YORBEE: LIST -> TAVERN -> DUNGEON ---
+        def render_quests():
+            c = document.getElementById("quest-container")
+            c.innerHTML = ""
+            for q in quests:
+                div = document.createElement("div")
+                div.className = "quest-card"
+                div.innerHTML = f"<div>{q['title']}</div><div>¥{q['reward']:,}</div>"
+                div.onclick = lambda e, t=q['title'], r=q['req_int']: open_tavern(t, r)
+                c.appendChild(div)
+
+        def add_demo_quest(e):
+            quests.insert(0, {"title": "緊急クエスト: バグ修正", "reward": 80000, "req_int": 9})
+            render_quests()
+
+        # TAVERN (Matching)
+        current_req_int = 0
+        current_quest_title = ""
+
+        def open_tavern(title, req_int):
+            global current_req_int, current_quest_title, party_score
+            current_quest_title = title
+            current_req_int = req_int
+            party_score = my_stats["int"] # Start with my stats
+            
+            document.getElementById('view-qlist').classList.add('hidden')
+            document.getElementById('view-tavern').classList.remove('hidden')
+            
+            document.getElementById('tav-title').innerText = title
+            render_partners()
+            update_party_status()
+
+        def render_partners():
+            c = document.getElementById("rec-list")
+            c.innerHTML = ""
+            for p in partners:
+                div = document.createElement("div")
+                div.className = "rec-card"
+                
+                match_text = ""
+                if p["int"] >= current_req_int: match_text = "✨ スキル適合"
+                
+                div.innerHTML = f"<div>{p['name']} (Fee: ¥{p['fee']})<br><span class='rec-match'>{match_text}</span></div>"
+                
+                # Invite Button
+                btn = document.createElement("button")
+                btn.innerText = "勧誘"
+                btn.style.background = "#000"; btn.style.color = "#fff"; btn.style.border = "1px solid #fff";
+                btn.onclick = lambda e, val=p["int"], el=div: invite_member(val, el)
+                
+                div.appendChild(btn)
+                c.appendChild(div)
+
+        def invite_member(val, el):
+            global party_score
+            party_score += val
+            el.style.borderColor = "gold" # Highlight
+            el.querySelector("button").innerText = "加入済"
+            el.querySelector("button").disabled = True
+            update_party_status()
+
+        def update_party_status():
+            # Win rate calc (Simple)
+            win_rate = min(100, int((party_score / current_req_int) * 100)) if current_req_int > 0 else 100
+            
+            document.getElementById("win-rate").innerText = win_rate
+            document.getElementById("win-bar").style.width = f"{win_rate}%"
+            
+            btn = document.getElementById("btn-depart")
+            if win_rate >= 100:
+                btn.disabled = False
+                btn.innerText = "🚀 このメンバーで出発する！"
+                btn.style.borderColor = "gold"
+                btn.style.color = "gold"
+            else:
+                btn.disabled = True
+                btn.innerText = "戦力不足..."
+
+        # DUNGEON (Progress)
+        def start_dungeon(e):
+            document.getElementById('view-tavern').classList.add('hidden')
+            document.getElementById('view-dungeon').classList.remove('hidden')
+            document.getElementById('dun-name').innerText = current_quest_title
+            log(f"Quest Started: {current_quest_title}")
+
+        def upd_prog(e):
+            boxes = document.querySelectorAll("#view-dungeon input[type='checkbox']")
+            checked = len([b for b in boxes if b.checked])
+            pct = int((checked / 3) * 100)
+            document.getElementById("dun-hp").style.width = f"{pct}%"
+            document.getElementById("dun-pct").innerText = pct
+            
+            if pct >= 100:
+                document.getElementById('btn-claim').style.display = 'block'
+
+        async def claim_reward(e):
+            log("QUEST CLEARED. REWARD DISTRIBUTED.")
+            await js.js_pub(1, f"CLAIM: {current_quest_title}", [["t","SBCM_CLAIM"]])
+            # Return to list
+            document.getElementById('view-dungeon').classList.add('hidden')
+            document.getElementById('view-qlist').classList.remove('hidden')
+            document.getElementById('disp-money').innerText = "25,000"
+
+        # G-CART AUDIT
+        async def audit(e):
+            try:
+                b=float(document.getElementById("a-b").value)
+                u=float(document.getElementById("a-u").value)
+                d = b/30000000/(u/72000) if u else 0
+                res = "SCAM" if d>10 else "SAFE"
+                document.getElementById("a-res").innerText = f"D: {d:.1f} [{res}]"
+            except: pass
+
+        forceStart()
+    </script>
+</body>
+</html>
