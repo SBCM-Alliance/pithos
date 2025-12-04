@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pithos OS | The Logic Shelter</title>
+    
+    <!-- PyScript -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
+    <style>
+        /* --- Pithos Dark Theme --- */
+        :root { --bg: #0a0a0a; --fg: #e0e0e0; --accent: #00ff41; --danger: #ff4b4b; --warn: #ffd700; }
+        body { background-color: var(--bg); color: var(--fg); font-family: 'Courier New', monospace; margin: 0; padding: 20px; line-height: 1.6; }
+        
+        h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 5px; }
+        .subtitle { color: #888; font-size: 0.9em; margin-bottom: 30px; font-style: italic; }
+        
+        /* Tabs */
+        .tab-buttons { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 20px; }
+        .tab-btn { background: #222; border: 1px solid #444; color: var(--fg); padding: 10px 20px; cursor: pointer; white-space: nowrap; }
+        .tab-btn.active { border-color: var(--accent); color: var(--accent); font-weight: bold; }
+        
+        /* Sections */
+        .module-section { display: none; animation: fadeIn 0.3s; }
+        .module-section.active { display: block; }
+        
+        /* Inputs & Cards */
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.8em; color: #888; }
+        input, select { background: #111; border: 1px solid #444; color: white; padding: 8px; width: 100%; box-sizing: border-box; font-family: inherit; }
+        button.action-btn { background: var(--fg); color: var(--bg); border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
+        button.action-btn:hover { background: var(--accent); }
+        button.danger-btn { background: var(--danger); color: white; }
+
+        /* Output Areas */
+        .console-output { background: #000; border: 1px solid #333; padding: 15px; margin-top: 20px; min-height: 50px; white-space: pre-wrap; word-break: break-all; }
+        .status-ok { color: var(--accent); }
+        .status-warn { color: var(--warn); }
+        .status-err { color: var(--danger); }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <h1>⚖️ Pithos OS</h1>
+    <div class="subtitle">"Part of that power which eternally wills evil and eternally works good."</div>
+
+    <!-- Navigation -->
+    <div class="tab-buttons">
+        <button class="tab-btn active" onclick="openTab('core')">📊 Core</button>
+        <button class="tab-btn" onclick="openTab('treasurer')">💰 Treasurer</button>
+        <button class="tab-btn" onclick="openTab('sphinx')">👁️ Sphinx</button>
+        <button class="tab-btn" onclick="openTab('ostraka')">🏺 Ostraka</button>
+    </div>
+
+    <!-- 1. CORE MODULE -->
+    <div id="core" class="module-section active">
+        <h3>SBCM Auditor (歪み計算)</h3>
+        <div class="input-group">
+            <label>自治体人口 (人)</label>
+            <input type="number" id="core-pop" value="435000">
+        </div>
+        <div class="input-group">
+            <label>事業予算 (円)</label>
+            <input type="number" id="core-budget" value="100000000">
+        </div>
+        <div class="input-group">
+            <label>推定利用者数 (人)</label>
+            <input type="number" id="core-users" value="3000">
+        </div>
+        <button class="action-btn" py-click="run_core">CALCULATE DISTORTION</button>
+        <div id="core-result" class="console-output">Ready...</div>
+    </div>
+
+    <!-- 2. TREASURER MODULE -->
+    <div id="treasurer" class="module-section">
+        <h3>Iron Vault (自動金庫)</h3>
+        <div class="input-group">
+            <label>チーム名 (Team ID)</label>
+            <input type="text" id="tr-team" value="Kashiwa-Road-JV">
+        </div>
+        <div class="input-group">
+            <label>報酬額 (円)</label>
+            <input type="number" id="tr-amount" value="500000">
+        </div>
+        <button class="action-btn" py-click="run_treasurer">GENERATE ZENGIN CSV</button>
+        <div id="tr-result" class="console-output">Waiting for input...</div>
+    </div>
+
+    <!-- 3. SPHINX MODULE -->
+    <div id="sphinx" class="module-section">
+        <h3>Project Sphinx (市民監査)</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <div style="flex:1; background:#222; padding:10px; text-align:center;">
+                <div>📸 BEFORE</div>
+                <div style="font-size:2em;">🕳️</div>
+            </div>
+            <div style="flex:1; background:#222; padding:10px; text-align:center;">
+                <div>📸 AFTER</div>
+                <div style="font-size:2em;" id="sphinx-img">❓</div>
+            </div>
+        </div>
+        <button class="action-btn" py-click="load_quest" style="margin-bottom:10px; background:#333; color:#fff;">↻ Load New Quest</button>
+        
+        <div style="display: flex; gap: 10px;">
+            <button class="action-btn" style="background:var(--accent); color:#000;" py-click="sphinx_verify">✅ VERIFY</button>
+            <button class="action-btn" style="background:var(--danger); color:#fff;" py-click="sphinx_reject">❌ REJECT</button>
+        </div>
+        <div id="sphinx-result" class="console-output">Quest loaded. Awaiting judgment.</div>
+    </div>
+
+    <!-- 4. OSTRAKA MODULE -->
+    <div id="ostraka" class="module-section">
+        <h3>Digital Ostraka (陶片追放)</h3>
+        <div class="input-group">
+            <label>追放対象ID (Target)</label>
+            <input type="text" id="os-target" value="Governor_Tanaka">
+        </div>
+        <div class="input-group">
+            <label>罪状 (Crime)</label>
+            <select id="os-reason">
+                <option>ハコモノ乱造 (High D_index)</option>
+                <option>データ改ざん (Fraud)</option>
+                <option>癒着 (Collusion)</option>
+            </select>
+        </div>
+        <button class="action-btn danger-btn" py-click="cast_ostraka">CAST SHARD (投票)</button>
+        <div id="os-result" class="console-output">System ready.</div>
+    </div>
+
+    <!-- JS for Tabs -->
+    <script>
+        function openTab(id) {
+            document.querySelectorAll('.module-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+
+    <!-- Load Python Logic -->
+    <script type="py" src="./pithos.py" config='{"packages": []}'></script>
+  </body>
+</html>
